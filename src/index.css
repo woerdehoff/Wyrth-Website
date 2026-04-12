@@ -289,6 +289,21 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   animation: fadeUp 0.8s var(--ease-out) 1.5s both;
 }
 
+.hero__signin {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+  animation: fadeUp 0.8s var(--ease-out) 1.8s both;
+}
+.hero__signin-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
 /* Scroll cue */
 .hero__scroll {
   position: absolute;
@@ -637,7 +652,7 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   margin: 0 auto;
   padding: 5.5rem 5%;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 4.5rem;
 }
 
@@ -683,6 +698,40 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   transition: color 0.2s;
 }
 .footer__col a:hover { color: var(--text-1); }
+
+.footer__account {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.footer__account-name {
+  font-size: 0.875rem;
+  color: var(--text-2);
+}
+.footer__account-hint {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  line-height: 1.6;
+  max-width: 200px;
+}
+.footer__signout {
+  background: none;
+  border: 1px solid var(--border-warm, #2e2820);
+  color: var(--text-3);
+  padding: 0.4rem 1rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: color 0.2s, border-color 0.2s;
+  align-self: flex-start;
+}
+.footer__signout:hover {
+  color: var(--accent, #b8894e);
+  border-color: var(--accent, #b8894e);
+}
 
 .footer__bottom {
   max-width: 1300px;
@@ -762,6 +811,8 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
     color: var(--text-2);
   }
   .nav__cta      { display: none; }
+  .nav__signin   { display: none; }
+  .nav__user-btn { display: none; }
   .nav__hamburger { display: flex; }
 
   .hero__title {
@@ -1414,7 +1465,34 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   color: var(--text-3, #888);
   font-size: 0.9rem;
   letter-spacing: 0.04em;
+  padding: 2rem 1.5rem;
+  text-align: center;
 }
+.cart-drawer__empty-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--text-1, #f0ece4);
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+.cart-drawer__empty-sub {
+  font-size: 0.78rem;
+  color: var(--text-3, #888);
+  letter-spacing: 0.03em;
+  margin: 0;
+  max-width: 260px;
+}
+.cart-drawer__empty-link {
+  font-size: 0.72rem;
+  color: var(--accent, #b8894e);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  margin-top: 0.5rem;
+  transition: opacity 0.2s;
+}
+.cart-drawer__empty-link:hover { opacity: 0.75; }
 
 .cart-drawer__items {
   flex: 1;
@@ -1532,7 +1610,17 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   cursor: pointer;
   transition: background 0.2s, opacity 0.2s;
 }
-.cart-drawer__checkout:hover { background: #c9996e; }
+.cart-drawer__checkout:hover:not(:disabled) { background: #c9996e; }
+.cart-drawer__checkout:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.cart-drawer__checkout-err {
+  font-size: 0.72rem;
+  color: #e07070;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
 .cart-drawer__clear {
   background: none;
   border: none;
@@ -1583,6 +1671,15 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   padding: 0 3px;
   line-height: 1;
 }
+.nav__signin {
+  display: flex;
+  align-items: center;
+}
+/* Scale down the Google button slightly to fit the nav */
+.nav__signin iframe {
+  transform: scale(0.9);
+  transform-origin: center;
+}
 .nav__user-btn {
   background: none;
   border: none;
@@ -1608,6 +1705,46 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Mobile menu sign-in / user items (hidden on desktop, shown inside hamburger menu) */
+.nav__links-signin,
+.nav__links-user {
+  display: none;
+}
+@media (max-width: 768px) {
+  .nav__links-signin,
+  .nav__links-user {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border, #1e1e1e);
+  }
+  .nav__links-user button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: none;
+    border: 1px solid var(--accent, #b8894e);
+    color: var(--accent, #b8894e);
+    padding: 0.6rem 1.5rem;
+    border-radius: 2px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+  }
+  .nav__links-user button:hover {
+    background: var(--accent, #b8894e);
+    color: var(--bg-1, #060606);
+  }
+  .nav__links-user .nav__avatar {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 /* ── Shop login prompt ───────────────────────────────────── */

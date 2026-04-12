@@ -1,14 +1,44 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
+import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+
+const API_URL = import.meta.env.VITE_CONTENT_API_URL
 
 function formatPrice(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 }
 
 export default function CartDrawer() {
+  const { user, login, logout, googleClientId, token } = useAuth()
   const { items, count, total, open, setOpen, removeItem, updateQty, clearCart } = useCart()
   const overlayRef = useRef(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutError,   setCheckoutError]   = useState(null)
+
+  async function handleCheckout() {
+    if (!API_URL) return
+    setCheckoutLoading(true)
+    setCheckoutError(null)
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res  = await fetch(`${API_URL}/shop/checkout`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Checkout failed')
+      window.location.href = data.url
+    } catch (err) {
+      setCheckoutError(err.message || 'Something went wrong. Please try again.')
+      setCheckoutLoading(false)
+    }
+  }
 
   // Close on Escape
   useEffect(() => {
@@ -43,8 +73,30 @@ export default function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="cart-drawer__empty">
-            <p>Your cart is empty.</p>
-            <button className="btn btn--gold" onClick={() => setOpen(false)}>Continue Shopping</button>
+            {!user ? (
+              <>
+                <p className="cart-drawer__empty-title">Sign in to shop</p>
+                <p className="cart-drawer__empty-sub">Use your Google account to add items and save your cart.</p>
+                {googleClientId ? (
+                  <GoogleLogin
+                    onSuccess={resp => login(resp.credential)}
+                    onError={() => {}}
+                    theme="filled_black"
+                    shape="rectangular"
+                    text="signin_with"
+                    size="large"
+                  />
+                ) : (
+                  <p className="cart-drawer__empty-sub">Google login not configured yet.</p>
+                )}
+                <Link to="/shop" className="cart-drawer__empty-link" onClick={() => setOpen(false)}>Browse the collection →</Link>
+              </>
+            ) : (
+              <>
+                <p>Your cart is empty.</p>
+                <Link to="/shop" className="btn btn--gold" onClick={() => setOpen(false)}>Shop the Cape</Link>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -80,17 +132,16 @@ export default function CartDrawer() {
                 <span>{formatPrice(total)}</span>
               </div>
               <p className="cart-drawer__shipping">Free U.S. shipping</p>
-              <Link
-                to="/shop/checkout-redirect"
+              {checkoutError && (
+                <p className="cart-drawer__checkout-err">{checkoutError}</p>
+              )}
+              <button
                 className="btn btn--gold cart-drawer__checkout"
-                onClick={() => {
-                  setOpen(false)
-                  // POC: send them to Shopify until Stripe is wired in
-                  window.location.href = 'https://wyrthco.com/products/salon-cape'
-                }}
+                onClick={handleCheckout}
+                disabled={checkoutLoading}
               >
-                Checkout
-              </Link>
+                {checkoutLoading ? 'Redirecting…' : 'Checkout'}
+              </button>
               <button className="cart-drawer__clear" onClick={clearCart}>Clear cart</button>
             </div>
           </>

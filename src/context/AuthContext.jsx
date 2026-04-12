@@ -46,11 +46,12 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthContext.Provider value={{ user, token, login, logout, googleClientId: GOOGLE_CLIENT_ID }}>
-        {children}
-      </AuthContext.Provider>
-    </GoogleOAuthProvider>
+    <AuthContext.Provider value={{ user, token, login, logout, googleClientId: GOOGLE_CLIENT_ID }}>
+      {GOOGLE_CLIENT_ID
+        ? <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{children}</GoogleOAuthProvider>
+        : children
+      }
+    </AuthContext.Provider>
   )
 }
 

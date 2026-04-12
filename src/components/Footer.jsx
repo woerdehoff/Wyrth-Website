@@ -1,3 +1,6 @@
+import { GoogleLogin } from '@react-oauth/google'
+import { useAuth } from '../context/AuthContext'
+
 const SHOP = [
   { label: 'The Cape',     href: 'https://wyrthco.com/products/salon-cape' },
   { label: 'For Barbers',  href: 'https://wyrthco.com/pages/barber-cape' },
@@ -13,6 +16,8 @@ const POLICIES = [
 ]
 
 export default function Footer() {
+  const { user, login, logout, googleClientId } = useAuth()
+
   return (
     <footer className="footer">
       <div className="footer__inner">
@@ -49,6 +54,30 @@ export default function Footer() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="footer__col">
+          <h4 className="footer__heading">Account</h4>
+          {user ? (
+            <div className="footer__account">
+              <p className="footer__account-name">{user.name || user.email}</p>
+              <button className="footer__signout" onClick={logout}>Sign Out</button>
+            </div>
+          ) : googleClientId ? (
+            <div className="footer__account">
+              <p className="footer__account-hint">Sign in to save your cart and check out faster.</p>
+              <GoogleLogin
+                onSuccess={resp => login(resp.credential)}
+                onError={() => {}}
+                theme="filled_black"
+                shape="rectangular"
+                text="signin_with"
+                size="medium"
+              />
+            </div>
+          ) : (
+            <p className="footer__account-hint">Account sign-in coming soon.</p>
+          )}
         </div>
 
       </div>

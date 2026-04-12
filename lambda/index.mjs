@@ -256,36 +256,65 @@ async function handleCheckout(event) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
-  const { productId, quantity = 1 } = body
-  if (!productId) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId is required' }) }
+  // Accept a cart items array  OR  a legacy single productId+quantity
+  let lineItemsInput
+  if (Array.isArray(body.items) && body.items.length > 0) {
+    lineItemsInput = body.items
+      .map(i => ({
+        productId: String(i.productId || '').slice(0, 64),
+        quantity:  Math.max(1, Math.min(10, Math.round(Number(i.quantity || 1)))),
+      }))
+      .filter(i => i.productId)
+  } else if (body.productId) {
+    lineItemsInput = [{
+      productId: String(body.productId).slice(0, 64),
+      quantity:  Math.max(1, Math.min(10, Math.round(Number(body.quantity || 1)))),
+    }]
+  } else {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'items array or productId is required' }) }
+  }
 
-  // POC mode: no Stripe key configured — bounce to Shopify
+  if (lineItemsInput.length === 0) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'No valid items' }) }
+  }
+
+  // No Stripe key — fall back to Shopify
   if (!STRIPE_SECRET_KEY) {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: 'https://wyrthco.com/products/salon-cape' }) }
   }
 
-  const result = await ddb.send(new GetItemCommand({ TableName: PRODUCTS_TABLE, Key: { productId: { S: String(productId) } } }))
-  if (!result.Item) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Product not found' }) }
+  // Look up authoritative prices from DynamoDB (prevents client-side price tampering)
+  const productResults = await Promise.all(
+    lineItemsInput.map(i =>
+      ddb.send(new GetItemCommand({ TableName: PRODUCTS_TABLE, Key: { productId: { S: i.productId } } }))
+    )
+  )
 
-  const product = unmarshal(result.Item)
-  if (!product.active) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Product not available' }) }
-
-  const qty    = Math.max(1, Math.min(10, Math.round(Number(quantity))))
   const params = {
     'mode': 'payment',
     'success_url': `${SITE_URL}/shop/success?session_id={CHECKOUT_SESSION_ID}`,
-    'cancel_url': `${SITE_URL}/shop/cancel`,
+    'cancel_url':  `${SITE_URL}/shop/cancel`,
     'customer_creation': 'always',
     'billing_address_collection': 'auto',
     'shipping_address_collection[allowed_countries][0]': 'US',
-    'line_items[0][quantity]': String(qty),
-    'line_items[0][price_data][currency]': 'usd',
-    'line_items[0][price_data][unit_amount]': String(product.priceInCents),
-    'line_items[0][price_data][product_data][name]': product.name,
-    'line_items[0][price_data][product_data][description]': product.description || '',
-    'metadata[productId]': productId,
   }
-  if (product.imageUrl) params['line_items[0][price_data][product_data][images][0]'] = product.imageUrl
+
+  for (let i = 0; i < lineItemsInput.length; i++) {
+    const item    = lineItemsInput[i]
+    const result  = productResults[i]
+    if (!result.Item) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: `Product not found: ${item.productId}` }) }
+    const product = unmarshal(result.Item)
+    if (!product.active) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Product unavailable: ${product.name}` }) }
+
+    params[`line_items[${i}][quantity]`]                              = String(item.quantity)
+    params[`line_items[${i}][price_data][currency]`]                  = 'usd'
+    params[`line_items[${i}][price_data][unit_amount]`]               = String(product.priceInCents)
+    params[`line_items[${i}][price_data][product_data][name]`]        = product.name
+    params[`line_items[${i}][price_data][product_data][description]`] = product.description || ''
+    if (product.imageUrl) params[`line_items[${i}][price_data][product_data][images][0]`] = product.imageUrl
+  }
+
+  params['metadata[productIds]'] = lineItemsInput.map(i => i.productId).join(',').slice(0, 500)
 
   const session = await stripePost('/v1/checkout/sessions', params)
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: session.url }) }
@@ -310,7 +339,8 @@ async function handleWebhook(event) {
       TableName: ORDERS_TABLE,
       Item: marshal({
         orderId: session.id, customerEmail: session.customer_details?.email || '',
-        customerName: session.customer_details?.name || '', productId: session.metadata?.productId || '',
+        customerName: session.customer_details?.name || '',
+        productId: session.metadata?.productIds || session.metadata?.productId || '',
         amountTotal: session.amount_total || 0, currency: session.currency || 'usd', status: 'paid',
         shippingAddress: JSON.stringify(session.shipping_details?.address || {}),
         createdAt: new Date().toISOString(),

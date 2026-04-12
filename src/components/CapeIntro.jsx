@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useContent } from '../context/ContentContext'
 
 export default function CapeIntro() {
@@ -40,14 +41,9 @@ export default function CapeIntro() {
           </div>
 
           <div>
-            <a
-              href="https://wyrthco.com/products/salon-cape"
-              className="btn btn--gold"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link to="/shop" className="btn btn--gold">
               Shop the Cape
-            </a>
+            </Link>
           </div>
         </div>
 
