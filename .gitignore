@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.tfvars
+!terraform/example.tfvars
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform.lock.hcl
+lambda/function.zip

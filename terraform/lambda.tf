@@ -1,0 +1,122 @@
+# -----------------------------------------------------------------------
+# lambda.tf — Content API: Lambda + API Gateway for admin saves
+# -----------------------------------------------------------------------
+
+# ── IAM ──────────────────────────────────────────────────────────────
+
+resource "aws_iam_role" "content_api" {
+  name = "${var.project_name}-content-api-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "content_api" {
+  name = "${var.project_name}-content-api-policy"
+  role = aws_iam_role.content_api.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject"]
+        Resource = "${aws_s3_bucket.website.arn}/content.json"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "cloudfront:CreateInvalidation"
+        Resource = "arn:aws:cloudfront::*:distribution/${aws_cloudfront_distribution.website.id}"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+    ]
+  })
+}
+
+# ── Lambda ────────────────────────────────────────────────────────────
+
+data "archive_file" "content_api" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/index.mjs"
+  output_path = "${path.module}/../lambda/function.zip"
+}
+
+resource "aws_lambda_function" "content_api" {
+  function_name    = "${var.project_name}-content-api"
+  role             = aws_iam_role.content_api.arn
+  handler          = "index.handler"
+  runtime          = "nodejs22.x"
+  filename         = data.archive_file.content_api.output_path
+  source_code_hash = data.archive_file.content_api.output_base64sha256
+  timeout          = 30
+
+  environment {
+    variables = {
+      BUCKET_NAME                = aws_s3_bucket.website.id
+      CLOUDFRONT_DISTRIBUTION_ID = aws_cloudfront_distribution.website.id
+      ENTRA_TENANT_ID            = var.entra_tenant_id
+      ENTRA_CLIENT_ID            = var.entra_client_id
+    }
+  }
+}
+
+# ── API Gateway (HTTP API v2) ─────────────────────────────────────────
+
+resource "aws_apigatewayv2_api" "content_api" {
+  name          = "${var.project_name}-content-api"
+  protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["Content-Type", "Authorization"]
+    max_age       = 300
+  }
+}
+
+resource "aws_apigatewayv2_integration" "content_api" {
+  api_id                 = aws_apigatewayv2_api.content_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.content_api.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "get_content" {
+  api_id    = aws_apigatewayv2_api.content_api.id
+  route_key = "GET /content"
+  target    = "integrations/${aws_apigatewayv2_integration.content_api.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_content" {
+  api_id    = aws_apigatewayv2_api.content_api.id
+  route_key = "POST /content"
+  target    = "integrations/${aws_apigatewayv2_integration.content_api.id}"
+}
+
+resource "aws_apigatewayv2_stage" "content_api" {
+  api_id      = aws_apigatewayv2_api.content_api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "content_api" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.content_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.content_api.execution_arn}/*/*"
+}
