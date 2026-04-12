@@ -8,15 +8,83 @@ const CONTENT_API_URL = import.meta.env.VITE_CONTENT_API_URL
 
 // ── Field primitives ─────────────────────────────────────────────────
 
-function Field({ label, value, onChange, rows, hint }) {
+function Field({ label, value, onChange, rows, hint, prefix }) {
   return (
     <div className="afield">
       <label className="afield__label">{label}</label>
       {hint && <p className="afield__hint">{hint}</p>}
-      {rows
-        ? <textarea className="afield__input afield__input--ta" rows={rows} value={value} onChange={e => onChange(e.target.value)} />
-        : <input    className="afield__input"                  type="text"  value={value} onChange={e => onChange(e.target.value)} />
-      }
+      {rows ? (
+        <textarea className="afield__input afield__input--ta" rows={rows} value={value} onChange={e => onChange(e.target.value)} />
+      ) : prefix ? (
+        <div className="afield__prefix-wrap">
+          <span className="afield__prefix">{prefix}</span>
+          <input className="afield__input afield__input--prefixed" type="text" value={value} onChange={e => onChange(e.target.value)} />
+        </div>
+      ) : (
+        <input className="afield__input" type="text" value={value} onChange={e => onChange(e.target.value)} />
+      )}
+    </div>
+  )
+}
+
+function ImageField({ label, value, onChange, onUpload }) {
+  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver]   = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+
+  async function handleFile(file) {
+    if (!file || !onUpload) return
+    setUploading(true)
+    setUploadErr('')
+    try {
+      const url = await onUpload(file)
+      if (url) onChange(url)
+    } catch (err) {
+      setUploadErr(err?.message || 'Upload failed')
+    }
+    setUploading(false)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer?.files?.[0]
+    if (file?.type?.startsWith('image/')) handleFile(file)
+  }
+
+  function handleDragLeave(e) {
+    // only clear when leaving the dropzone entirely, not its children
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setDragOver(false)
+  }
+
+  function handleFileInput(e) {
+    handleFile(e.target.files?.[0])
+  }
+
+  return (
+    <div className="afield">
+      <label className="afield__label">{label}</label>
+      <div
+        className={`afield__dropzone${dragOver ? ' afield__dropzone--active' : ''}`}
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {value ? (
+          <div className="afield__img-preview">
+            <img src={value} alt="Preview" />
+            <button type="button" className="afield__img-remove" onClick={() => onChange('')}>✕</button>
+          </div>
+        ) : (
+          <div className="afield__drop-cta">
+            <span>{uploading ? 'Uploading…' : 'Drop image here or click to upload'}</span>
+            <input type="file" accept="image/*" onChange={handleFileInput} className="afield__file-input" disabled={uploading} />
+          </div>
+        )}
+      </div>
+      {uploadErr && <p className="afield__hint" style={{ color: '#e05555' }}>{uploadErr}</p>}
+      <input className="afield__input" type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="…or paste an image URL" style={{ marginTop: '0.5rem' }} />
     </div>
   )
 }
@@ -72,6 +140,16 @@ function AnnouncementTab({ draft, setDraft }) {
         <>
           <Field label="Message" value={draft.announcement.message} onChange={v => set('message', v)} rows={2} />
           <Field label="Link URL (optional)" value={draft.announcement.link || ''} onChange={v => set('link', v)} hint="Leave blank for no link." />
+          {draft.announcement.message && (
+            <div className="atab__preview">
+              <span className="atab__preview-label">Preview</span>
+              <div className="preview-announcement">
+                {draft.announcement.link
+                  ? <a href={draft.announcement.link} target="_blank" rel="noopener noreferrer">{draft.announcement.message}</a>
+                  : draft.announcement.message}
+              </div>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -88,6 +166,16 @@ function HeroTab({ draft, setDraft }) {
       <Field label="Eyebrow (small text above WYRTH)"  value={draft.hero.eyebrow} onChange={v => set('eyebrow', v)} />
       <Field label="Sub-headline (below the divider line)" value={draft.hero.sub}     onChange={v => set('sub', v)} />
       <Field label="Tagline (smaller secondary line)"  value={draft.hero.tagline} onChange={v => set('tagline', v)} />
+      <div className="atab__preview">
+        <span className="atab__preview-label">Preview</span>
+        <div className="preview-hero">
+          <p className="preview-hero__eyebrow">{draft.hero.eyebrow}</p>
+          <h1 className="preview-hero__title">WYRTH</h1>
+          <div className="preview-hero__divider" />
+          <p className="preview-hero__sub">{draft.hero.sub}</p>
+          <p className="preview-hero__tagline">{draft.hero.tagline}</p>
+        </div>
+      </div>
     </section>
   )
 }
@@ -132,6 +220,24 @@ function CapeTab({ draft, setDraft }) {
           <Field key={i} label={`Badge ${i + 1}`} value={b} onChange={v => setBadge(i, v)} />
         ))}
       </div>
+      <div className="atab__preview">
+        <span className="atab__preview-label">Preview</span>
+        <div className="preview-cape">
+          <p className="preview-cape__title">
+            {draft.cape.titleLine1} <em>{draft.cape.titleLine2}</em>
+          </p>
+          <div className="preview-cape__stats">
+            {draft.cape.stats.map((s, i) => (
+              <span key={i} className="preview-cape__stat"><strong>{s.value}</strong> {s.label}</span>
+            ))}
+          </div>
+          <div className="preview-cape__badges">
+            {draft.cape.badges.filter(Boolean).map((b, i) => (
+              <span key={i} className="preview-cape__badge">{b}</span>
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
@@ -152,6 +258,18 @@ function AudiencesTab({ draft, setDraft }) {
           <Field label="Description"              value={a.desc}  onChange={v => set(i, 'desc',  v)} rows={3} />
         </div>
       ))}
+      <div className="atab__preview">
+        <span className="atab__preview-label">Preview</span>
+        <div className="preview-audiences">
+          {draft.audiences.map((a, i) => (
+            <div key={i} className="preview-audiences__card">
+              <span className="preview-audiences__tag">{a.tag}</span>
+              <strong>{a.title}</strong>
+              <p>{a.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
@@ -171,6 +289,18 @@ function FeaturesTab({ draft, setDraft }) {
           <Field label="Description" value={f.desc}  onChange={v => set(i, 'desc',  v)} rows={3} />
         </div>
       ))}
+      <div className="atab__preview">
+        <span className="atab__preview-label">Preview</span>
+        <div className="preview-features">
+          {draft.features.map((f, i) => (
+            <div key={i} className="preview-features__card">
+              <span className="preview-features__num">{f.num}</span>
+              <strong>{f.title}</strong>
+              <p>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
@@ -184,24 +314,38 @@ function StatementTab({ draft, setDraft }) {
       <h2 className="atab__title">Statement Quote</h2>
       <p className="atab__desc">The large italic pull-quote displayed in the Statement section. Do not include quotation marks — they are added automatically.</p>
       <Field label="Quote text" value={draft.statement.quote} onChange={set} rows={3} />
+      <div className="atab__preview">
+        <span className="atab__preview-label">Preview</span>
+        <div className="preview-statement">
+          <blockquote>&ldquo;{draft.statement.quote}&rdquo;</blockquote>
+          <p>— WYRTH</p>
+        </div>
+      </div>
     </section>
   )
 }
 
 // ── Shop: Products tab ────────────────────────────────────────────────
 
-const EMPTY_PRODUCT = { productId: '', name: '', description: '', priceInCents: '', imageUrl: '', active: true }
+const EMPTY_PRODUCT = { productId: '', name: '', description: '', priceDollars: '', imageUrl: '', active: true }
 
-function ProductsTab({ products, onSave, onDelete, status }) {
-  const [form,    setForm]    = useState(EMPTY_PRODUCT)
-  const [editing, setEditing] = useState(false)
+function ProductsTab({ products, onSave, onDelete, status, onUploadImage }) {
+  const [form,      setForm]      = useState(EMPTY_PRODUCT)
+  const [editing,   setEditing]   = useState(false)
+  const [formError, setFormError] = useState('')
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  function handlePriceChange(raw) {
+    // Allow only digits and a single decimal point
+    const cleaned = raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+    set('priceDollars', cleaned)
+  }
+
   function startEdit(p) {
-    setForm({ ...p, priceInCents: String(p.priceInCents) })
+    setForm({ ...p, priceDollars: (p.priceInCents / 100).toFixed(2) })
     setEditing(true)
   }
 
@@ -212,8 +356,11 @@ function ProductsTab({ products, onSave, onDelete, status }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const cents = Math.round(parseFloat(form.priceInCents) * 100)
-    if (!form.productId || !form.name || !cents) return
+    const cents = Math.round(parseFloat(form.priceDollars) * 100)
+    if (!form.productId) { setFormError('Product ID is required.'); return }
+    if (!form.name)       { setFormError('Name is required.'); return }
+    if (!form.priceDollars || isNaN(cents) || cents <= 0) { setFormError('Please enter a valid price.'); return }
+    setFormError('')
     await onSave({ ...form, priceInCents: cents })
     setForm(EMPTY_PRODUCT)
     setEditing(false)
@@ -228,11 +375,12 @@ function ProductsTab({ products, onSave, onDelete, status }) {
           hint="Lowercase letters, numbers, hyphens. This is the unique key — it will be normalised on save." />
         <Field label="Name" value={form.name} onChange={v => set('name', v)} />
         <Field label="Description" value={form.description} onChange={v => set('description', v)} rows={3} />
-        <Field label="Price (in cents — e.g. 8900 = $89.00)" value={form.priceInCents} onChange={v => set('priceInCents', v)}
-          hint="Enter the price in cents. $89.00 = 8900" />
-        <Field label="Image URL" value={form.imageUrl} onChange={v => set('imageUrl', v)} />
+        <Field label="Price" value={form.priceDollars} onChange={handlePriceChange}
+          hint="Enter in dollars, e.g. 59.99" prefix="$" />
+        <ImageField label="Image" value={form.imageUrl} onChange={v => set('imageUrl', v)} onUpload={onUploadImage} />
         <Toggle label="Active (visible in shop)" checked={form.active} onChange={v => set('active', v)} />
         <div className="atab__actions">
+          {formError && <p className="atab__form-err">{formError}</p>}
           <button type="submit" className="btn btn--gold" disabled={status === 'saving'}>
             {editing ? 'Update Product' : 'Add Product'}
           </button>
@@ -346,10 +494,11 @@ function AdminPanel() {
   const { instance, accounts } = useMsal()
   const account = accounts[0]
 
-  const [draft,     setDraft]     = useState(defaultContent)
-  const [activeTab, setActiveTab] = useState('announcement')
-  const [status,    setStatus]    = useState(null) // null | 'loading' | 'saving' | 'saved' | 'error'
-  const [errorMsg,  setErrorMsg]  = useState('')
+  const [draft,       setDraft]       = useState(defaultContent)
+  const [liveContent, setLiveContent] = useState(null)
+  const [activeTab,   setActiveTab]   = useState('announcement')
+  const [status,      setStatus]      = useState(null) // null | 'loading' | 'saving' | 'saved' | 'error'
+  const [errorMsg,    setErrorMsg]    = useState('')
 
   // Shop state
   const [products,    setProducts]    = useState(null)
@@ -357,13 +506,34 @@ function AdminPanel() {
   const [shopStatus,  setShopStatus]  = useState(null)
   const [shopError,   setShopError]   = useState('')
 
+  // Track whether draft has changed from live
+  const hasChanges = liveContent && JSON.stringify(draft) !== JSON.stringify(liveContent)
+
+  // Unsaved changes warning
+  useEffect(() => {
+    function handler(e) {
+      if (hasChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasChanges])
+
   // Load current live content on mount
   useEffect(() => {
     if (!CONTENT_API_URL) return
     setStatus('loading')
     fetch(`${CONTENT_API_URL}/content`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setDraft(data); setStatus(null) })
+      .then(data => {
+        if (data) {
+          setDraft(data)
+          setLiveContent(JSON.parse(JSON.stringify(data)))
+        }
+        setStatus(null)
+      })
       .catch(() => setStatus(null))
   }, [])
 
@@ -491,11 +661,39 @@ function AdminPanel() {
       }
 
       setStatus('saved')
+      setLiveContent(JSON.parse(JSON.stringify(draft)))
       setTimeout(() => setStatus(null), 4000)
     } catch (err) {
       setErrorMsg(err.message)
       setStatus('error')
     }
+  }
+
+  function handleRevert() {
+    if (!liveContent) return
+    if (!window.confirm('Revert all changes to the last published version?')) return
+    setDraft(JSON.parse(JSON.stringify(liveContent)))
+  }
+
+  async function uploadImage(file) {
+    if (!CONTENT_API_URL) return null
+    const token = await getToken()
+    // Get presigned URL from Lambda
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const res = await fetch(`${CONTENT_API_URL}/shop/upload-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ext, contentType: file.type }),
+    })
+    if (!res.ok) throw new Error('Failed to get upload URL')
+    const { uploadUrl, publicUrl } = await res.json()
+    // Upload directly to S3
+    await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    })
+    return publicUrl
   }
 
   function handleLogout() {
@@ -509,7 +707,7 @@ function AdminPanel() {
     audiences:    <AudiencesTab    draft={draft} setDraft={setDraft} />,
     features:     <FeaturesTab     draft={draft} setDraft={setDraft} />,
     statement:    <StatementTab    draft={draft} setDraft={setDraft} />,
-    products:     <ProductsTab     products={products} onSave={saveProduct} onDelete={deleteProduct} status={shopStatus} />,
+    products:     <ProductsTab     products={products} onSave={saveProduct} onDelete={deleteProduct} status={shopStatus} onUploadImage={uploadImage} />,
     orders:       <OrdersTab       orders={orders} />,
   }
 
@@ -531,9 +729,16 @@ function AdminPanel() {
           {shopStatus === 'saving' && SHOP_TABS.has(activeTab) && <span className="admin__status admin__status--muted">Saving…</span>}
           <span className="admin__user">{account?.name ?? account?.username}</span>
           {!SHOP_TABS.has(activeTab) && (
-            <button className="admin__publish btn btn--gold" onClick={handlePublish} disabled={status === 'saving' || status === 'loading'}>
-              Publish
-            </button>
+            <>
+              {hasChanges && (
+                <button className="admin__revert btn btn--outline" onClick={handleRevert}>
+                  Revert
+                </button>
+              )}
+              <button className="admin__publish btn btn--gold" onClick={handlePublish} disabled={status === 'saving' || status === 'loading'}>
+                {hasChanges ? '● Publish' : 'Publish'}
+              </button>
+            </>
           )}
           <button className="admin__logout" onClick={handleLogout}>Sign out</button>
         </div>

@@ -31,6 +31,18 @@ resource "aws_s3_bucket_versioning" "website" {
   }
 }
 
+# CORS — allows browser-side presigned URL uploads from any origin
+resource "aws_s3_bucket_cors_configuration" "website" {
+  bucket = aws_s3_bucket.website.id
+
+  cors_rule {
+    allowed_headers = ["Content-Type"]
+    allowed_methods = ["PUT"]
+    allowed_origins = ["*"]
+    max_age_seconds = 3000
+  }
+}
+
 # Server-side encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "website" {
   bucket = aws_s3_bucket.website.id

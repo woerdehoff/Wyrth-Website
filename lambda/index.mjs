@@ -1,7 +1,8 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
-import { createPublicKey, createVerify, createHmac, timingSafeEqual } from 'node:crypto'
+import { createPublicKey, createVerify, createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
 
 const s3  = new S3Client({})
 const cf  = new CloudFrontClient({ region: 'us-east-1' })
@@ -409,6 +410,33 @@ async function handleSaveCart(event) {
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
 }
 
+// ── Image upload (presigned URL) ──────────────────────────────────────
+async function handleUploadUrl(event) {
+  const auth = event.headers?.authorization || event.headers?.Authorization
+  await verifyEntraToken(auth)
+
+  const body = JSON.parse(event.body || '{}')
+  const ext = (body.ext || 'jpg').replace(/[^a-z0-9]/gi, '').slice(0, 10)
+  const contentType = (body.contentType || 'image/jpeg').slice(0, 100)
+
+  const key = `uploads/${randomUUID()}.${ext}`
+
+  const uploadUrl = await getSignedUrl(s3, new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+  }), { expiresIn: 300 })
+
+  // Public URL through CloudFront
+  const publicUrl = `https://${process.env.CLOUDFRONT_DOMAIN || ''}/${key}`
+
+  return {
+    statusCode: 200,
+    headers: CORS,
+    body: JSON.stringify({ uploadUrl, publicUrl }),
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method
@@ -428,8 +456,9 @@ export const handler = async (event) => {
       if (method === 'GET')  return await handleGetProducts()
       if (method === 'POST') return await handleUpsertProduct(event)
     }
-    if (path === '/shop/checkout' && method === 'POST') return await handleCheckout(event)
-    if (path === '/shop/webhook'  && method === 'POST') return await handleWebhook(event)
+    if (path === '/shop/checkout'    && method === 'POST') return await handleCheckout(event)
+    if (path === '/shop/upload-url' && method === 'POST') return await handleUploadUrl(event)
+    if (path === '/shop/webhook'    && method === 'POST') return await handleWebhook(event)
     if (path === '/shop/orders'   && method === 'GET')  return await handleGetOrders(event)
     if (path === '/shop/cart') {
       if (method === 'GET')  return await handleGetCart(event)

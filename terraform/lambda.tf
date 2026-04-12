@@ -35,6 +35,11 @@ resource "aws_iam_role_policy" "content_api" {
       },
       {
         Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.website.arn}/uploads/*"
+      },
+      {
+        Effect   = "Allow"
         Action   = "cloudfront:CreateInvalidation"
         Resource = "arn:aws:cloudfront::*:distribution/${aws_cloudfront_distribution.website.id}"
       },
@@ -97,6 +102,7 @@ resource "aws_lambda_function" "content_api" {
       CARTS_TABLE                = aws_dynamodb_table.carts.name
       SITE_URL                   = local.site_url
       GOOGLE_CLIENT_ID           = var.google_client_id
+      CLOUDFRONT_DOMAIN          = aws_cloudfront_distribution.website.domain_name
     }
   }
 }

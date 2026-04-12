@@ -30,7 +30,7 @@ npm run build
 
 echo ""
 echo "Uploading to S3 bucket: $BUCKET"
-aws s3 sync dist/ "s3://$BUCKET" --delete
+aws s3 sync dist/ "s3://$BUCKET" --delete --exclude "uploads/*"
 
 echo ""
 echo "Invalidating CloudFront cache (distribution: $DISTRIBUTION_ID)..."
