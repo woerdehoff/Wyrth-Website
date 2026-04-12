@@ -47,7 +47,11 @@ const TABS = [
   { id: 'audiences',   label: 'Audiences' },
   { id: 'features',    label: 'Features' },
   { id: 'statement',   label: 'Statement' },
+  { id: 'products',    label: 'Products' },
+  { id: 'orders',      label: 'Orders' },
 ]
+
+const SHOP_TABS = new Set(['products', 'orders'])
 
 // ── Section editors ───────────────────────────────────────────────────
 
@@ -184,6 +188,137 @@ function StatementTab({ draft, setDraft }) {
   )
 }
 
+// ── Shop: Products tab ────────────────────────────────────────────────
+
+const EMPTY_PRODUCT = { productId: '', name: '', description: '', priceInCents: '', imageUrl: '', active: true }
+
+function ProductsTab({ products, onSave, onDelete, status }) {
+  const [form,    setForm]    = useState(EMPTY_PRODUCT)
+  const [editing, setEditing] = useState(false)
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function startEdit(p) {
+    setForm({ ...p, priceInCents: String(p.priceInCents) })
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setForm(EMPTY_PRODUCT)
+    setEditing(false)
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const cents = Math.round(parseFloat(form.priceInCents) * 100)
+    if (!form.productId || !form.name || !cents) return
+    await onSave({ ...form, priceInCents: cents })
+    setForm(EMPTY_PRODUCT)
+    setEditing(false)
+  }
+
+  return (
+    <section className="atab">
+      <h2 className="atab__title">{editing ? 'Edit Product' : 'Add Product'}</h2>
+      <p className="atab__desc">Products are stored in DynamoDB and shown on the /shop page.</p>
+      <form onSubmit={handleSubmit}>
+        <Field label="Product ID (slug, e.g. capsule-cape)" value={form.productId} onChange={v => set('productId', v)}
+          hint="Lowercase letters, numbers, hyphens. This is the unique key — it will be normalised on save." />
+        <Field label="Name" value={form.name} onChange={v => set('name', v)} />
+        <Field label="Description" value={form.description} onChange={v => set('description', v)} rows={3} />
+        <Field label="Price (in cents — e.g. 8900 = $89.00)" value={form.priceInCents} onChange={v => set('priceInCents', v)}
+          hint="Enter the price in cents. $89.00 = 8900" />
+        <Field label="Image URL" value={form.imageUrl} onChange={v => set('imageUrl', v)} />
+        <Toggle label="Active (visible in shop)" checked={form.active} onChange={v => set('active', v)} />
+        <div className="atab__actions">
+          <button type="submit" className="btn btn--gold" disabled={status === 'saving'}>
+            {editing ? 'Update Product' : 'Add Product'}
+          </button>
+          {editing && (
+            <button type="button" className="btn btn--outline" onClick={cancelEdit}>Cancel</button>
+          )}
+        </div>
+      </form>
+
+      {products === null && <p className="atab__desc" style={{ marginTop: '2rem' }}>Loading products…</p>}
+      {products?.length === 0 && <p className="atab__desc" style={{ marginTop: '2rem' }}>No products yet. Add one above.</p>}
+
+      {products?.length > 0 && (
+        <div className="atab__group" style={{ marginTop: '2.5rem' }}>
+          <h3 className="atab__group-title">Existing Products</h3>
+          {products.map(p => (
+            <div key={p.productId} className="product-admin-row">
+              <div className="product-admin-row__info">
+                <span className="product-admin-row__name">{p.name}</span>
+                <span className="product-admin-row__price">${(p.priceInCents / 100).toFixed(2)}</span>
+                <span className={`product-admin-row__badge product-admin-row__badge--${p.active ? 'active' : 'off'}`}>
+                  {p.active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="product-admin-row__actions">
+                <button className="btn btn--sm" onClick={() => startEdit(p)}>Edit</button>
+                <button className="btn btn--sm btn--danger" onClick={() => onDelete(p.productId)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Shop: Orders tab ──────────────────────────────────────────────────
+
+function OrdersTab({ orders }) {
+  if (orders === null) {
+    return (
+      <section className="atab">
+        <h2 className="atab__title">Orders</h2>
+        <p className="atab__desc">Loading orders…</p>
+      </section>
+    )
+  }
+  if (orders.length === 0) {
+    return (
+      <section className="atab">
+        <h2 className="atab__title">Orders</h2>
+        <p className="atab__desc">No orders yet.</p>
+      </section>
+    )
+  }
+  return (
+    <section className="atab">
+      <h2 className="atab__title">Orders ({orders.length})</h2>
+      <div className="orders-table-wrap">
+        <table className="orders-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map(o => (
+              <tr key={o.orderId}>
+                <td>{new Date(o.createdAt).toLocaleDateString()}</td>
+                <td>{o.customerName || '—'}</td>
+                <td>{o.customerEmail || '—'}</td>
+                <td>${(o.amountTotal / 100).toFixed(2)}</td>
+                <td><span className={`order-status order-status--${o.status}`}>{o.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 // ── Login page ────────────────────────────────────────────────────────
 
 function LoginPage() {
@@ -216,6 +351,12 @@ function AdminPanel() {
   const [status,    setStatus]    = useState(null) // null | 'loading' | 'saving' | 'saved' | 'error'
   const [errorMsg,  setErrorMsg]  = useState('')
 
+  // Shop state
+  const [products,    setProducts]    = useState(null)
+  const [orders,      setOrders]      = useState(null)
+  const [shopStatus,  setShopStatus]  = useState(null)
+  const [shopError,   setShopError]   = useState('')
+
   // Load current live content on mount
   useEffect(() => {
     if (!CONTENT_API_URL) return
@@ -225,6 +366,100 @@ function AdminPanel() {
       .then(data => { if (data) setDraft(data); setStatus(null) })
       .catch(() => setStatus(null))
   }, [])
+
+  // Lazy-load shop data when tab first opened
+  useEffect(() => {
+    if (activeTab === 'products' && products === null) loadProducts()
+    if (activeTab === 'orders'   && orders === null)   loadOrders()
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Token helper ───────────────────────────────────────────────────
+  async function getToken() {
+    try {
+      const res = await instance.acquireTokenSilent({ ...loginRequest, account })
+      return res.idToken
+    } catch (e) {
+      if (e instanceof InteractionRequiredAuthError) {
+        await instance.acquireTokenRedirect({ ...loginRequest, account })
+      }
+      throw e
+    }
+  }
+
+  // ── Products API ───────────────────────────────────────────────────
+  async function loadProducts() {
+    setShopError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${CONTENT_API_URL}/shop/products/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setProducts(data.products || [])
+    } catch (err) {
+      setShopError(err.message)
+      setProducts([])
+    }
+  }
+
+  async function saveProduct(product) {
+    setShopStatus('saving')
+    setShopError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${CONTENT_API_URL}/shop/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(product),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setShopStatus(null)
+      loadProducts()
+    } catch (err) {
+      setShopError(err.message)
+      setShopStatus(null)
+    }
+  }
+
+  async function deleteProduct(productId) {
+    if (!window.confirm(`Delete product "${productId}"? This cannot be undone.`)) return
+    setShopStatus('saving')
+    setShopError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${CONTENT_API_URL}/shop/products/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setShopStatus(null)
+      loadProducts()
+    } catch (err) {
+      setShopError(err.message)
+      setShopStatus(null)
+    }
+  }
+
+  // ── Orders API ─────────────────────────────────────────────────────
+  async function loadOrders() {
+    setShopError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${CONTENT_API_URL}/shop/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setOrders(data.orders || [])
+    } catch (err) {
+      setShopError(err.message)
+      setOrders([])
+    }
+  }
 
   async function handlePublish() {
     setStatus('saving')
@@ -274,6 +509,8 @@ function AdminPanel() {
     audiences:    <AudiencesTab    draft={draft} setDraft={setDraft} />,
     features:     <FeaturesTab     draft={draft} setDraft={setDraft} />,
     statement:    <StatementTab    draft={draft} setDraft={setDraft} />,
+    products:     <ProductsTab     products={products} onSave={saveProduct} onDelete={deleteProduct} status={shopStatus} />,
+    orders:       <OrdersTab       orders={orders} />,
   }
 
   return (
@@ -290,10 +527,14 @@ function AdminPanel() {
           {status === 'saving'  && <span className="admin__status admin__status--muted">Publishing…</span>}
           {status === 'saved'   && <span className="admin__status admin__status--ok">✓ Published</span>}
           {status === 'error'   && <span className="admin__status admin__status--err" title={errorMsg}>✗ Error: {errorMsg}</span>}
+          {shopError && SHOP_TABS.has(activeTab) && <span className="admin__status admin__status--err">{shopError}</span>}
+          {shopStatus === 'saving' && SHOP_TABS.has(activeTab) && <span className="admin__status admin__status--muted">Saving…</span>}
           <span className="admin__user">{account?.name ?? account?.username}</span>
-          <button className="admin__publish btn btn--gold" onClick={handlePublish} disabled={status === 'saving' || status === 'loading'}>
-            Publish
-          </button>
+          {!SHOP_TABS.has(activeTab) && (
+            <button className="admin__publish btn btn--gold" onClick={handlePublish} disabled={status === 'saving' || status === 'loading'}>
+              Publish
+            </button>
+          )}
           <button className="admin__logout" onClick={handleLogout}>Sign out</button>
         </div>
       </header>

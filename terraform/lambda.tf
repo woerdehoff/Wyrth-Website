@@ -17,6 +17,10 @@ resource "aws_iam_role" "content_api" {
   })
 }
 
+locals {
+  site_url = var.site_url != "" ? var.site_url : "https://${aws_cloudfront_distribution.website.domain_name}"
+}
+
 resource "aws_iam_role_policy" "content_api" {
   name = "${var.project_name}-content-api-policy"
   role = aws_iam_role.content_api.id
@@ -33,6 +37,22 @@ resource "aws_iam_role_policy" "content_api" {
         Effect   = "Allow"
         Action   = "cloudfront:CreateInvalidation"
         Resource = "arn:aws:cloudfront::*:distribution/${aws_cloudfront_distribution.website.id}"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.products.arn,
+          aws_dynamodb_table.orders.arn,
+          aws_dynamodb_table.carts.arn,
+        ]
       },
       {
         Effect = "Allow"
@@ -70,6 +90,13 @@ resource "aws_lambda_function" "content_api" {
       CLOUDFRONT_DISTRIBUTION_ID = aws_cloudfront_distribution.website.id
       ENTRA_TENANT_ID            = var.entra_tenant_id
       ENTRA_CLIENT_ID            = var.entra_client_id
+      STRIPE_SECRET_KEY          = var.stripe_secret_key
+      STRIPE_WEBHOOK_SECRET      = var.stripe_webhook_secret
+      PRODUCTS_TABLE             = aws_dynamodb_table.products.name
+      ORDERS_TABLE               = aws_dynamodb_table.orders.name
+      CARTS_TABLE                = aws_dynamodb_table.carts.name
+      SITE_URL                   = local.site_url
+      GOOGLE_CLIENT_ID           = var.google_client_id
     }
   }
 }
@@ -83,7 +110,7 @@ resource "aws_apigatewayv2_api" "content_api" {
   cors_configuration {
     allow_origins = ["*"]
     allow_methods = ["GET", "POST", "OPTIONS"]
-    allow_headers = ["Content-Type", "Authorization"]
+    allow_headers = ["Content-Type", "Authorization", "Stripe-Signature"]
     max_age       = 300
   }
 }
@@ -104,6 +131,13 @@ resource "aws_apigatewayv2_route" "get_content" {
 resource "aws_apigatewayv2_route" "post_content" {
   api_id    = aws_apigatewayv2_api.content_api.id
   route_key = "POST /content"
+  target    = "integrations/${aws_apigatewayv2_integration.content_api.id}"
+}
+
+# Catch-all route — handles all /shop/* endpoints (explicit routes above take priority)
+resource "aws_apigatewayv2_route" "default" {
+  api_id    = aws_apigatewayv2_api.content_api.id
+  route_key = "$default"
   target    = "integrations/${aws_apigatewayv2_integration.content_api.id}"
 }
 

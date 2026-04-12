@@ -10,19 +10,23 @@
 
 set -euo pipefail
 
-echo "Reading Terraform outputs..."
+echo "Applying Terraform (Lambda code + infra)..."
 cd "$(dirname "$0")/terraform"
+terraform apply -auto-approve
 
 BUCKET=$(terraform output -raw s3_bucket_name)
 DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
 SITE_URL=$(terraform output -raw cloudfront_url)
 CONTENT_API_URL=$(terraform output -raw content_api_url)
+GOOGLE_CLIENT_ID=$(terraform output -raw google_client_id 2>/dev/null || echo "")
 
 cd ..
 
 echo ""
 echo "Building React app..."
-VITE_CONTENT_API_URL="$CONTENT_API_URL" npm run build
+VITE_CONTENT_API_URL="$CONTENT_API_URL" \
+VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+npm run build
 
 echo ""
 echo "Uploading to S3 bucket: $BUCKET"

@@ -31,3 +31,8 @@ output "content_api_url" {
   description = "Base URL for the content admin API"
   value       = aws_apigatewayv2_stage.content_api.invoke_url
 }
+
+output "google_client_id" {
+  description = "Google OAuth client ID passed to the React build"
+  value       = var.google_client_id
+}

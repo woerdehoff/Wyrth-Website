@@ -1,36 +1,49 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
-import { createPublicKey, createVerify } from 'node:crypto'
+import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
+import { createPublicKey, createVerify, createHmac, timingSafeEqual } from 'node:crypto'
 
-const s3 = new S3Client({})
-const cf = new CloudFrontClient({ region: 'us-east-1' })
+const s3  = new S3Client({})
+const cf  = new CloudFrontClient({ region: 'us-east-1' })
+const ddb = new DynamoDBClient({})
 
-const BUCKET          = process.env.BUCKET_NAME
-const DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID
-const TENANT_ID       = process.env.ENTRA_TENANT_ID
-const CLIENT_ID       = process.env.ENTRA_CLIENT_ID
+const BUCKET                = process.env.BUCKET_NAME
+const DISTRIBUTION_ID       = process.env.CLOUDFRONT_DISTRIBUTION_ID
+const TENANT_ID             = process.env.ENTRA_TENANT_ID
+const CLIENT_ID             = process.env.ENTRA_CLIENT_ID
+const STRIPE_SECRET_KEY     = process.env.STRIPE_SECRET_KEY
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+const PRODUCTS_TABLE        = process.env.PRODUCTS_TABLE
+const ORDERS_TABLE          = process.env.ORDERS_TABLE
+const CARTS_TABLE           = process.env.CARTS_TABLE
+const SITE_URL              = process.env.SITE_URL
+const GOOGLE_CLIENT_ID      = process.env.GOOGLE_CLIENT_ID
 
-// ── JWKS cache (warm Lambda reuse) ───────────────────────────────────
-let jwksCache     = null
-let jwksCacheTime = 0
-const JWKS_TTL    = 3_600_000 // 1 hour
+// ── JWKS caches ───────────────────────────────────────────────────────
+let entraJwksCache     = null, entraJwksCacheTime = 0
+let googleJwksCache    = null, googleJwksCacheTime = 0
+const JWKS_TTL = 3_600_000
 
-async function getJwks() {
-  if (jwksCache && (Date.now() - jwksCacheTime) < JWKS_TTL) return jwksCache
-  const res = await fetch(
-    `https://login.microsoftonline.com/${TENANT_ID}/discovery/v2.0/keys`
-  )
-  if (!res.ok) throw new Error('Failed to fetch JWKS')
+async function getEntraJwks() {
+  if (entraJwksCache && (Date.now() - entraJwksCacheTime) < JWKS_TTL) return entraJwksCache
+  const res = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/discovery/v2.0/keys`)
+  if (!res.ok) throw new Error('Failed to fetch Entra JWKS')
   const data = await res.json()
-  jwksCache     = data.keys
-  jwksCacheTime = Date.now()
-  return jwksCache
+  entraJwksCache = data.keys; entraJwksCacheTime = Date.now()
+  return entraJwksCache
 }
 
-// ── JWT validation (RS256, no external deps) ────────────────────────
-async function verifyEntraToken(authHeader) {
-  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
-  const token = authHeader.slice(7)
+async function getGoogleJwks() {
+  if (googleJwksCache && (Date.now() - googleJwksCacheTime) < JWKS_TTL) return googleJwksCache
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/certs')
+  if (!res.ok) throw new Error('Failed to fetch Google JWKS')
+  const data = await res.json()
+  googleJwksCache = data.keys; googleJwksCacheTime = Date.now()
+  return googleJwksCache
+}
+
+// ── Generic RS256 JWT verifier ────────────────────────────────────────
+async function verifyRS256(token, getJwks, { audience, issuer }) {
   const parts = token.split('.')
   if (parts.length !== 3) throw new Error('Malformed JWT')
 
@@ -40,26 +53,40 @@ async function verifyEntraToken(authHeader) {
   if (header.alg !== 'RS256') throw new Error('Unexpected algorithm')
 
   const now = Math.floor(Date.now() / 1000)
-  if (payload.exp && payload.exp < now)        throw new Error('Token expired')
-  if (payload.nbf && payload.nbf > now + 60)   throw new Error('Token not yet valid')
-  if (payload.aud !== CLIENT_ID)                throw new Error('Invalid audience')
-
-  const expectedIss = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`
-  if (payload.iss !== expectedIss)              throw new Error('Invalid issuer')
+  if (payload.exp && payload.exp < now)       throw new Error('Token expired')
+  if (payload.nbf && payload.nbf > now + 60)  throw new Error('Token not yet valid')
+  if (audience && payload.aud !== audience)   throw new Error('Invalid audience')
+  if (issuer) {
+    const issuers = Array.isArray(issuer) ? issuer : [issuer]
+    if (!issuers.includes(payload.iss))       throw new Error('Invalid issuer')
+  }
 
   const keys = await getJwks()
   const jwk  = keys.find(k => k.kid === header.kid && k.kty === 'RSA')
   if (!jwk) throw new Error('Signing key not found')
 
   const publicKey = createPublicKey({ key: jwk, format: 'jwk' })
-  const data      = Buffer.from(`${parts[0]}.${parts[1]}`)
-  const sig       = Buffer.from(parts[2], 'base64url')
-
-  const verifier = createVerify('RSA-SHA256')
-  verifier.update(data)
-  if (!verifier.verify(publicKey, sig)) throw new Error('Invalid signature')
+  const verifier  = createVerify('RSA-SHA256')
+  verifier.update(Buffer.from(`${parts[0]}.${parts[1]}`))
+  if (!verifier.verify(publicKey, Buffer.from(parts[2], 'base64url'))) throw new Error('Invalid signature')
 
   return payload
+}
+
+async function verifyEntraToken(authHeader) {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
+  return verifyRS256(authHeader.slice(7), getEntraJwks, {
+    audience: CLIENT_ID,
+    issuer: `https://login.microsoftonline.com/${TENANT_ID}/v2.0`,
+  })
+}
+
+async function verifyGoogleToken(authHeader) {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
+  return verifyRS256(authHeader.slice(7), getGoogleJwks, {
+    audience: GOOGLE_CLIENT_ID,
+    issuer: ['https://accounts.google.com', 'accounts.google.com'],
+  })
 }
 
 // ── CORS headers ─────────────────────────────────────────────────────
@@ -69,43 +96,77 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
-// ── Handler ──────────────────────────────────────────────────────────
-export const handler = async (event) => {
-  const method = event.requestContext?.http?.method
-
-  if (method === 'OPTIONS') {
-    return { statusCode: 204, headers: CORS, body: '' }
+// ── DynamoDB helpers ─────────────────────────────────────────────────
+function marshal(obj) {
+  const result = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue
+    if (typeof v === 'string')        result[k] = { S: v }
+    else if (typeof v === 'number')   result[k] = { N: String(v) }
+    else if (typeof v === 'boolean')  result[k] = { BOOL: v }
+    else if (typeof v === 'object')   result[k] = { S: JSON.stringify(v) }
   }
+  return result
+}
 
-  // GET /content — return saved content.json (no auth required, public data)
-  if (method === 'GET') {
-    try {
-      const result = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'content.json' }))
-      const body   = await result.Body.transformToString()
-      return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body }
-    } catch (err) {
-      if (err.name === 'NoSuchKey') {
-        return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No content saved yet' }) }
-      }
-      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Internal error' }) }
-    }
+function unmarshal(item) {
+  const result = {}
+  for (const [k, v] of Object.entries(item)) {
+    if (v.S    !== undefined) result[k] = v.S
+    else if (v.N    !== undefined) result[k] = Number(v.N)
+    else if (v.BOOL !== undefined) result[k] = v.BOOL
   }
+  return result
+}
 
-  if (method !== 'POST') {
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
+// ── Stripe helpers ────────────────────────────────────────────────────
+function stripeAuth() {
+  return 'Basic ' + Buffer.from(`${STRIPE_SECRET_KEY}:`).toString('base64')
+}
 
-  // POST /content — verify Entra ID token, then save
+async function stripePost(path, params) {
+  const res = await fetch(`https://api.stripe.com${path}`, {
+    method: 'POST',
+    headers: { Authorization: stripeAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || 'Stripe error')
+  return data
+}
+
+function verifyStripeSignature(rawBody, header) {
+  if (!header) throw new Error('Missing Stripe-Signature header')
+  const t  = header.match(/t=(\d+)/)?.[1]
+  const v1 = header.match(/v1=([a-f0-9]+)/)?.[1]
+  if (!t || !v1) throw new Error('Invalid Stripe-Signature header')
+  const expected = createHmac('sha256', STRIPE_WEBHOOK_SECRET).update(`${t}.${rawBody}`).digest('hex')
+  const bufA = Buffer.from(v1, 'hex'), bufB = Buffer.from(expected, 'hex')
+  if (bufA.length !== bufB.length || !timingSafeEqual(bufA, bufB)) throw new Error('Invalid webhook signature')
+  if (Math.floor(Date.now() / 1000) - Number(t) > 300) throw new Error('Webhook replay: timestamp too old')
+}
+
+// ── Route: GET /content ───────────────────────────────────────────────
+async function handleGetContent() {
   try {
-    await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization)
+    const result = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'content.json' }))
+    const body   = await result.Body.transformToString()
+    return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body }
   } catch (err) {
-    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) }
+    if (err.name === 'NoSuchKey') {
+      return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No content saved yet' }) }
+    }
+    throw err
   }
+}
+
+// ── Route: POST /content ──────────────────────────────────────────────
+async function handlePostContent(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body
-  try {
-    body = JSON.parse(event.body || '{}')
-  } catch {
+  try { body = JSON.parse(event.body || '{}') } catch {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
@@ -115,20 +176,239 @@ export const handler = async (event) => {
   }
 
   await s3.send(new PutObjectCommand({
-    Bucket:      BUCKET,
-    Key:         'content.json',
-    Body:        JSON.stringify(content),
-    ContentType: 'application/json',
-    CacheControl: 'public, max-age=60',
+    Bucket: BUCKET, Key: 'content.json',
+    Body: JSON.stringify(content), ContentType: 'application/json', CacheControl: 'public, max-age=60',
   }))
-
   await cf.send(new CreateInvalidationCommand({
     DistributionId: DISTRIBUTION_ID,
-    InvalidationBatch: {
-      CallerReference: Date.now().toString(),
-      Paths: { Quantity: 1, Items: ['/content.json'] },
-    },
+    InvalidationBatch: { CallerReference: Date.now().toString(), Paths: { Quantity: 1, Items: ['/content.json'] } },
+  }))
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+}
+
+// ── Route: GET /shop/products ─────────────────────────────────────────
+async function handleGetProducts() {
+  const result = await ddb.send(new ScanCommand({
+    TableName: PRODUCTS_TABLE,
+    FilterExpression: 'active = :t',
+    ExpressionAttributeValues: { ':t': { BOOL: true } },
+  }))
+  const products = (result.Items || []).map(unmarshal)
+  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ products }) }
+}
+
+// ── Route: GET /shop/products/all (admin) ─────────────────────────────
+async function handleGetAllProducts(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  const result = await ddb.send(new ScanCommand({ TableName: PRODUCTS_TABLE }))
+  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ products: (result.Items || []).map(unmarshal) }) }
+}
+
+// ── Route: POST /shop/products (admin) ───────────────────────────────
+async function handleUpsertProduct(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  const { productId, name, description, priceInCents, imageUrl, active } = body
+  if (!productId || !name || !priceInCents) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId, name, and priceInCents are required' }) }
+  }
+
+  const safeId = String(productId).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 64)
+  await ddb.send(new PutItemCommand({
+    TableName: PRODUCTS_TABLE,
+    Item: marshal({
+      productId: safeId, name: String(name).slice(0, 200),
+      description: String(description || '').slice(0, 1000),
+      priceInCents: Math.max(1, Math.round(Number(priceInCents))),
+      imageUrl: String(imageUrl || '').slice(0, 500),
+      active: active !== false, createdAt: new Date().toISOString(),
+    }),
+  }))
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, productId: safeId }) }
+}
+
+// ── Route: POST /shop/products/delete (admin) ─────────────────────────
+async function handleDeleteProduct(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  if (!body.productId) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId is required' }) }
+  await ddb.send(new DeleteItemCommand({ TableName: PRODUCTS_TABLE, Key: { productId: { S: String(body.productId) } } }))
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+}
+
+// ── Route: POST /shop/checkout ────────────────────────────────────────
+async function handleCheckout(event) {
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  const { productId, quantity = 1 } = body
+  if (!productId) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId is required' }) }
+
+  // POC mode: no Stripe key configured — bounce to Shopify
+  if (!STRIPE_SECRET_KEY) {
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: 'https://wyrthco.com/products/salon-cape' }) }
+  }
+
+  const result = await ddb.send(new GetItemCommand({ TableName: PRODUCTS_TABLE, Key: { productId: { S: String(productId) } } }))
+  if (!result.Item) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Product not found' }) }
+
+  const product = unmarshal(result.Item)
+  if (!product.active) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Product not available' }) }
+
+  const qty    = Math.max(1, Math.min(10, Math.round(Number(quantity))))
+  const params = {
+    'mode': 'payment',
+    'success_url': `${SITE_URL}/shop/success?session_id={CHECKOUT_SESSION_ID}`,
+    'cancel_url': `${SITE_URL}/shop/cancel`,
+    'customer_creation': 'always',
+    'billing_address_collection': 'auto',
+    'shipping_address_collection[allowed_countries][0]': 'US',
+    'line_items[0][quantity]': String(qty),
+    'line_items[0][price_data][currency]': 'usd',
+    'line_items[0][price_data][unit_amount]': String(product.priceInCents),
+    'line_items[0][price_data][product_data][name]': product.name,
+    'line_items[0][price_data][product_data][description]': product.description || '',
+    'metadata[productId]': productId,
+  }
+  if (product.imageUrl) params['line_items[0][price_data][product_data][images][0]'] = product.imageUrl
+
+  const session = await stripePost('/v1/checkout/sessions', params)
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: session.url }) }
+}
+
+// ── Route: POST /shop/webhook ─────────────────────────────────────────
+async function handleWebhook(event) {
+  const rawBody   = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : (event.body || '')
+  const sigHeader = event.headers?.['stripe-signature'] || event.headers?.['Stripe-Signature']
+
+  try { verifyStripeSignature(rawBody, sigHeader) }
+  catch (err) { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: err.message }) } }
+
+  let stripeEvent
+  try { stripeEvent = JSON.parse(rawBody) } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  if (stripeEvent.type === 'checkout.session.completed') {
+    const session = stripeEvent.data.object
+    await ddb.send(new PutItemCommand({
+      TableName: ORDERS_TABLE,
+      Item: marshal({
+        orderId: session.id, customerEmail: session.customer_details?.email || '',
+        customerName: session.customer_details?.name || '', productId: session.metadata?.productId || '',
+        amountTotal: session.amount_total || 0, currency: session.currency || 'usd', status: 'paid',
+        shippingAddress: JSON.stringify(session.shipping_details?.address || {}),
+        createdAt: new Date().toISOString(),
+      }),
+    }))
+  }
+
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ received: true }) }
+}
+
+// ── Route: GET /shop/orders (admin) ──────────────────────────────────
+async function handleGetOrders(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  const result = await ddb.send(new ScanCommand({ TableName: ORDERS_TABLE }))
+  const orders = (result.Items || []).map(unmarshal).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ orders }) }
+}
+
+// ── Route: GET /shop/cart ─────────────────────────────────────────────
+async function handleGetCart(event) {
+  let user
+  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  const result = await ddb.send(new GetItemCommand({ TableName: CARTS_TABLE, Key: { userId: { S: user.sub } } }))
+  if (!result.Item) return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [] }) }
+
+  const cart  = unmarshal(result.Item)
+  const items = JSON.parse(cart.items || '[]')
+  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }
+}
+
+// ── Route: POST /shop/cart ────────────────────────────────────────────
+async function handleSaveCart(event) {
+  let user
+  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  const { items } = body
+  if (!Array.isArray(items)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'items must be an array' }) }
+
+  // Sanitize: only keep known scalar fields, clamp quantity
+  const clean = items.map(i => ({
+    productId:    String(i.productId    || '').slice(0, 64),
+    name:         String(i.name         || '').slice(0, 200),
+    priceInCents: Math.max(0, Math.round(Number(i.priceInCents || 0))),
+    imageUrl:     String(i.imageUrl     || '').slice(0, 500),
+    quantity:     Math.max(1, Math.min(99, Math.round(Number(i.quantity || 1)))),
+  })).filter(i => i.productId)
+
+  // TTL: 30 days
+  const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
+
+  await ddb.send(new PutItemCommand({
+    TableName: CARTS_TABLE,
+    Item: marshal({ userId: user.sub, email: user.email || '', items: JSON.stringify(clean), updatedAt: new Date().toISOString(), expiresAt }),
   }))
 
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+}
+
+// ── Main handler ──────────────────────────────────────────────────────
+export const handler = async (event) => {
+  const method = event.requestContext?.http?.method
+  const path   = event.requestContext?.http?.path || '/'
+
+  if (method === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' }
+
+  try {
+    if (path === '/content') {
+      if (method === 'GET')  return await handleGetContent()
+      if (method === 'POST') return await handlePostContent(event)
+    }
+
+    if (path === '/shop/products/all'    && method === 'GET')  return await handleGetAllProducts(event)
+    if (path === '/shop/products/delete' && method === 'POST') return await handleDeleteProduct(event)
+    if (path === '/shop/products') {
+      if (method === 'GET')  return await handleGetProducts()
+      if (method === 'POST') return await handleUpsertProduct(event)
+    }
+    if (path === '/shop/checkout' && method === 'POST') return await handleCheckout(event)
+    if (path === '/shop/webhook'  && method === 'POST') return await handleWebhook(event)
+    if (path === '/shop/orders'   && method === 'GET')  return await handleGetOrders(event)
+    if (path === '/shop/cart') {
+      if (method === 'GET')  return await handleGetCart(event)
+      if (method === 'POST') return await handleSaveCart(event)
+    }
+
+    return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Not found' }) }
+  } catch (err) {
+    console.error(err)
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Internal server error' }) }
+  }
 }
