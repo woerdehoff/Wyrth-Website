@@ -398,6 +398,11 @@ function ProductsTab({ products, onSave, onDelete, status, onUploadImage }) {
           <h3 className="atab__group-title">Existing Products</h3>
           {products.map(p => (
             <div key={p.productId} className="product-admin-row">
+              {p.imageUrl && (
+                <div className="product-admin-row__img">
+                  <img src={p.imageUrl} alt={p.name} />
+                </div>
+              )}
               <div className="product-admin-row__info">
                 <span className="product-admin-row__name">{p.name}</span>
                 <span className="product-admin-row__price">${(p.priceInCents / 100).toFixed(2)}</span>
