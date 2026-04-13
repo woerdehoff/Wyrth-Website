@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { ContentProvider } from './context/ContentContext'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
@@ -33,11 +34,28 @@ function PublicSite() {
   )
 }
 
+function ScrollToHash() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const hash = location.hash.slice(1)
+    if (!hash) return
+    
+    setTimeout(() => {
+      const el = document.getElementById(hash)
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
+  }, [location.hash])
+  
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
         <ContentProvider>
+          <ScrollToHash />
           <Routes>
             <Route path="/admin"         element={<Admin />} />
             <Route path="/shop/success"  element={<ShopSuccess />} />

@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 
 const NAV_LINKS = [
-  { label: 'The Cape', href: '#cape' },
-  { label: 'Barbers',  href: '#audience' },
-  { label: 'Stylists', href: '#audience' },
-  { label: 'Features', href: '#features' },
+  { label: 'The Cape', href: '/#cape' },
+  { label: 'Barbers',  href: '/#audience' },
+  { label: 'Stylists', href: '/#audience' },
+  { label: 'Features', href: '/#features' },
 ]
 
 export default function Nav() {
@@ -31,7 +31,7 @@ export default function Nav() {
         <ul className={`nav__links${open ? ' nav__links--open' : ''}`}>
           {NAV_LINKS.map(l => (
             <li key={l.label}>
-              <a href={l.href} onClick={() => setOpen(false)}>{l.label}</a>
+              <Link to={l.href} onClick={() => setOpen(false)}>{l.label}</Link>
             </li>
           ))}
           <li>
