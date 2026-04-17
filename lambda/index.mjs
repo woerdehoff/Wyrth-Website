@@ -1,8 +1,8 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
-import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
-import { createPublicKey, createVerify, createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
+import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand, UpdateItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { createPublicKey, createVerify, createHmac, createHash, timingSafeEqual, randomUUID } from 'node:crypto'
 
 const s3  = new S3Client({})
 const cf  = new CloudFrontClient({ region: 'us-east-1' })
@@ -17,6 +17,7 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 const PRODUCTS_TABLE        = process.env.PRODUCTS_TABLE
 const ORDERS_TABLE          = process.env.ORDERS_TABLE
 const CARTS_TABLE           = process.env.CARTS_TABLE
+const ANALYTICS_TABLE       = process.env.ANALYTICS_TABLE
 const SITE_URL              = process.env.SITE_URL
 const GOOGLE_CLIENT_ID      = process.env.GOOGLE_CLIENT_ID
 
@@ -281,7 +282,7 @@ async function handleCheckout(event) {
 
   // No Stripe key — fall back to Shopify
   if (!STRIPE_SECRET_KEY) {
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: 'https://wyrthco.com/products/salon-cape' }) }
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: `${SITE_URL}/shop` }) }
   }
 
   // Look up authoritative prices from DynamoDB (prevents client-side price tampering)
@@ -437,6 +438,114 @@ async function handleUploadUrl(event) {
   }
 }
 
+// ── Route: POST /analytics/track ──────────────────────────────────────
+async function handleTrack(event) {
+  if (!ANALYTICS_TABLE) return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  const page = String(body.page || '/').slice(0, 200)
+  if (!page.startsWith('/')) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid page' }) }
+  if (page.startsWith('/admin')) return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const ttl = Math.floor(Date.now() / 1000) + 90 * 86400
+
+  const ip = event.requestContext?.http?.sourceIp || 'unknown'
+  const visitorHash = createHash('sha256').update(ip + today).digest('hex').slice(0, 16)
+
+  // Increment page views
+  await ddb.send(new UpdateItemCommand({
+    TableName: ANALYTICS_TABLE,
+    Key: { pk: { S: 'PAGE' }, sk: { S: `${today}#${page}` } },
+    UpdateExpression: 'ADD #v :one SET #ttl = :ttl',
+    ExpressionAttributeNames: { '#v': 'views', '#ttl': 'ttl' },
+    ExpressionAttributeValues: { ':one': { N: '1' }, ':ttl': { N: String(ttl) } },
+  }))
+
+  // Increment daily total
+  await ddb.send(new UpdateItemCommand({
+    TableName: ANALYTICS_TABLE,
+    Key: { pk: { S: 'DAILY' }, sk: { S: today } },
+    UpdateExpression: 'ADD #v :one SET #ttl = :ttl',
+    ExpressionAttributeNames: { '#v': 'views', '#ttl': 'ttl' },
+    ExpressionAttributeValues: { ':one': { N: '1' }, ':ttl': { N: String(ttl) } },
+  }))
+
+  // Track unique visitor
+  try {
+    await ddb.send(new PutItemCommand({
+      TableName: ANALYTICS_TABLE,
+      Item: { pk: { S: `VIS#${today}` }, sk: { S: visitorHash }, ttl: { N: String(ttl) } },
+      ConditionExpression: 'attribute_not_exists(pk)',
+    }))
+    await ddb.send(new UpdateItemCommand({
+      TableName: ANALYTICS_TABLE,
+      Key: { pk: { S: 'DAILY' }, sk: { S: today } },
+      UpdateExpression: 'ADD #vis :one',
+      ExpressionAttributeNames: { '#vis': 'visitors' },
+      ExpressionAttributeValues: { ':one': { N: '1' } },
+    }))
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err
+  }
+
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+}
+
+// ── Route: GET /analytics ─────────────────────────────────────────────
+async function handleGetAnalytics(event) {
+  try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+
+  if (!ANALYTICS_TABLE) {
+    return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ daily: [], pages: [] }) }
+  }
+
+  const days = Math.min(90, Math.max(1, Number(event.queryStringParameters?.days) || 30))
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - days)
+  const startStr = start.toISOString().slice(0, 10)
+  const endStr = now.toISOString().slice(0, 10)
+
+  const dailyResult = await ddb.send(new QueryCommand({
+    TableName: ANALYTICS_TABLE,
+    KeyConditionExpression: 'pk = :pk AND sk BETWEEN :s AND :e',
+    ExpressionAttributeValues: { ':pk': { S: 'DAILY' }, ':s': { S: startStr }, ':e': { S: endStr } },
+  }))
+
+  const daily = (dailyResult.Items || []).map(item => ({
+    date: item.sk.S,
+    views: Number(item.views?.N || 0),
+    visitors: Number(item.visitors?.N || 0),
+  })).sort((a, b) => a.date.localeCompare(b.date))
+
+  const pageResult = await ddb.send(new QueryCommand({
+    TableName: ANALYTICS_TABLE,
+    KeyConditionExpression: 'pk = :pk AND sk BETWEEN :s AND :e',
+    ExpressionAttributeValues: { ':pk': { S: 'PAGE' }, ':s': { S: startStr }, ':e': { S: `${endStr}~` } },
+  }))
+
+  const pageMap = {}
+  for (const item of (pageResult.Items || [])) {
+    const page = item.sk.S.split('#').slice(1).join('#')
+    pageMap[page] = (pageMap[page] || 0) + Number(item.views?.N || 0)
+  }
+  const pages = Object.entries(pageMap)
+    .map(([page, views]) => ({ page, views }))
+    .sort((a, b) => b.views - a.views)
+
+  return {
+    statusCode: 200,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ daily, pages }),
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method
@@ -464,6 +573,9 @@ export const handler = async (event) => {
       if (method === 'GET')  return await handleGetCart(event)
       if (method === 'POST') return await handleSaveCart(event)
     }
+
+    if (path === '/analytics/track' && method === 'POST') return await handleTrack(event)
+    if (path === '/analytics'       && method === 'GET')  return await handleGetAnalytics(event)
 
     return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Not found' }) }
   } catch (err) {

@@ -57,6 +57,7 @@ resource "aws_iam_role_policy" "content_api" {
           aws_dynamodb_table.products.arn,
           aws_dynamodb_table.orders.arn,
           aws_dynamodb_table.carts.arn,
+          aws_dynamodb_table.analytics.arn,
         ]
       },
       {
@@ -100,6 +101,7 @@ resource "aws_lambda_function" "content_api" {
       PRODUCTS_TABLE             = aws_dynamodb_table.products.name
       ORDERS_TABLE               = aws_dynamodb_table.orders.name
       CARTS_TABLE                = aws_dynamodb_table.carts.name
+      ANALYTICS_TABLE            = aws_dynamodb_table.analytics.name
       SITE_URL                   = local.site_url
       GOOGLE_CLIENT_ID           = var.google_client_id
       CLOUDFRONT_DOMAIN          = aws_cloudfront_distribution.website.domain_name

@@ -199,6 +199,7 @@ function Tip({ text }) {
 
 const TABS = [
   { id: 'dashboard',    label: 'Dashboard',    icon: '⌂',  group: 'overview' },
+  { id: 'analytics',    label: 'Analytics',     icon: '◔',  group: 'overview' },
   { id: 'announcement', label: 'Announcement', icon: '📣', group: 'content'  },
   { id: 'hero',         label: 'Hero',         icon: '✦',  group: 'content'  },
   { id: 'cape',         label: 'The Cape',     icon: '◈',  group: 'content'  },
@@ -515,6 +516,114 @@ function StatementTab({ draft, setDraft }) {
           <p>— WYRTH</p>
         </div>
       </div>
+    </section>
+  )
+}
+
+// ── Analytics tab ─────────────────────────────────────────────────────
+
+function AnalyticsTab({ analytics, onRefresh, loading }) {
+  if (!analytics && loading) {
+    return (
+      <section className="atab">
+        <h2 className="atab__title">Analytics</h2>
+        <p className="atab__desc">Loading analytics data…</p>
+      </section>
+    )
+  }
+
+  const daily = analytics?.daily || []
+  const pages = analytics?.pages || []
+
+  // Fill in missing days for the last 30 days
+  const dayMap = {}
+  for (const d of daily) dayMap[d.date] = d
+  const filled = []
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - i)
+    const ds = d.toISOString().slice(0, 10)
+    filled.push(dayMap[ds] || { date: ds, views: 0, visitors: 0 })
+  }
+
+  const totalViews    = filled.reduce((s, d) => s + d.views, 0)
+  const totalVisitors = filled.reduce((s, d) => s + d.visitors, 0)
+  const activeDays    = filled.filter(d => d.views > 0).length
+  const avgViews      = activeDays ? Math.round(totalViews / activeDays) : 0
+  const topPage       = pages[0]?.page || '—'
+  const maxViews      = Math.max(...filled.map(d => d.views), 1)
+
+  return (
+    <section className="atab">
+      <div className="analytics-header">
+        <div>
+          <h2 className="atab__title" style={{ marginBottom: 0 }}>Analytics</h2>
+          <p className="atab__desc">Last 30 days of visitor activity.</p>
+        </div>
+        <button className="btn btn--sm btn--outline" onClick={onRefresh} disabled={loading}>
+          {loading ? <><Spinner /> Refreshing…</> : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="dash__stats">
+        <div className="dash__stat">
+          <span className="dash__stat-value">{totalViews.toLocaleString()}</span>
+          <span className="dash__stat-label">Page Views</span>
+        </div>
+        <div className="dash__stat">
+          <span className="dash__stat-value">{totalVisitors.toLocaleString()}</span>
+          <span className="dash__stat-label">Unique Visitors</span>
+        </div>
+        <div className="dash__stat">
+          <span className="dash__stat-value">{avgViews.toLocaleString()}</span>
+          <span className="dash__stat-label">Avg Views / Day</span>
+        </div>
+        <div className="dash__stat">
+          <span className="dash__stat-value analytics__top-page">{topPage}</span>
+          <span className="dash__stat-label">Top Page</span>
+        </div>
+      </div>
+
+      <div className="atab__group">
+        <h3 className="atab__group-title">Daily Views</h3>
+        <div className="analytics__chart">
+          {filled.map((d, i) => (
+            <div key={d.date} className="analytics__bar-col" title={`${d.date}\n${d.views} views · ${d.visitors} visitors`}>
+              {d.views > 0 && <span className="analytics__bar-value">{d.views}</span>}
+              <div className="analytics__bar" style={{ height: `${(d.views / maxViews) * 100}%` }} />
+              <span className="analytics__bar-label">{i % 7 === 0 || i === filled.length - 1 ? d.date.slice(5) : ''}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {pages.length > 0 && (
+        <div className="atab__group">
+          <h3 className="atab__group-title">Top Pages</h3>
+          <div className="orders-table-wrap">
+            <table className="orders-table">
+              <thead><tr><th>Page</th><th>Views</th><th></th></tr></thead>
+              <tbody>
+                {pages.map(p => (
+                  <tr key={p.page}>
+                    <td><code style={{ color: 'var(--accent)', fontSize: '0.85rem' }}>{p.page}</code></td>
+                    <td>{p.views.toLocaleString()}</td>
+                    <td style={{ width: '120px' }}>
+                      <div className="analytics__page-bar-wrap">
+                        <div className="analytics__page-bar" style={{ width: `${(p.views / (pages[0]?.views || 1)) * 100}%` }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!analytics && !loading && (
+        <p className="atab__desc" style={{ marginTop: '1.5rem' }}>No analytics data yet. Data will appear after visitors start browsing the site.</p>
+      )}
     </section>
   )
 }
@@ -851,6 +960,10 @@ function AdminPanel() {
   const [shopStatus,  setShopStatus]  = useState(null)
   const [shopError,   setShopError]   = useState('')
 
+  // Analytics state
+  const [analytics,        setAnalytics]        = useState(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
   // Toasts
   const [toasts, setToasts] = useState([])
   function addToast(message, type = 'success') {
@@ -897,6 +1010,7 @@ function AdminPanel() {
   useEffect(() => {
     if ((activeTab === 'products' || activeTab === 'dashboard') && products === null) loadProducts()
     if ((activeTab === 'orders'   || activeTab === 'dashboard') && orders === null)   loadOrders()
+    if (activeTab === 'analytics' && analytics === null && !analyticsLoading) loadAnalytics()
   }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Token helper ───────────────────────────────────────────────────
@@ -990,6 +1104,24 @@ function AdminPanel() {
     }
   }
 
+  // ── Analytics API ───────────────────────────────────────────────────
+  async function loadAnalytics() {
+    setAnalyticsLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${CONTENT_API_URL}/analytics`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setAnalytics(data)
+    } catch (err) {
+      addToast(err.message, 'error')
+      setAnalytics(prev => prev || { daily: [], pages: [] })
+    }
+    setAnalyticsLoading(false)
+  }
+
   async function handlePublish() {
     setStatus('saving')
     setErrorMsg('')
@@ -1069,6 +1201,7 @@ function AdminPanel() {
 
   const tabMap = {
     dashboard:    <DashboardTab    products={products} orders={orders} hasChanges={hasChanges} onGoTo={navigate} />,
+    analytics:    <AnalyticsTab    analytics={analytics} onRefresh={loadAnalytics} loading={analyticsLoading} />,
     announcement: <AnnouncementTab draft={draft} setDraft={setDraft} />,
     hero:         <HeroTab         draft={draft} setDraft={setDraft} />,
     cape:         <CapeTab         draft={draft} setDraft={setDraft} />,
@@ -1138,7 +1271,7 @@ function AdminPanel() {
           {status === 'error'   && <span className="admin__status admin__status--err" title={errorMsg}>✗ {errorMsg}</span>}
           {shopError && SHOP_TABS.has(activeTab) && <span className="admin__status admin__status--err">{shopError}</span>}
           <span className="admin__user">{account?.name ?? account?.username}</span>
-          {!SHOP_TABS.has(activeTab) && activeTab !== 'dashboard' && (
+          {CONTENT_TABS.has(activeTab) && (
             <>
               {hasChanges && (
                 <button className="admin__revert btn btn--outline" onClick={handleRevert}>Revert</button>

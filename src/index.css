@@ -306,6 +306,8 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   color: var(--text-3);
 }
 
+/* ─── Hero text overrides (dark photo overlay, keep light) ─────── */
+
 /* Scroll cue */
 .hero__scroll {
   position: absolute;
@@ -2707,5 +2709,129 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--accent-lt);
+}
+
+/* ─── Policy Pages ──────────────────────────────────────────────── */
+.policy-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 6rem 1.5rem 8rem;
+  color: var(--text-1);
+}
+.policy-page__title {
+  font-family: var(--ff-display);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+.policy-page__updated {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  margin-bottom: 2.5rem;
+}
+.policy-page h2 {
+  font-family: var(--ff-display);
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin: 2.5rem 0 0.75rem;
+}
+.policy-page h3 {
+  font-family: var(--ff-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 1.5rem 0 0.5rem;
+}
+.policy-page p,
+.policy-page li {
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: var(--text-2);
+  margin-bottom: 0.75rem;
+}
+.policy-page ul {
+  padding-left: 1.4rem;
+  margin-bottom: 0.75rem;
+}
+.policy-page li { margin-bottom: 0.4rem; }
+.policy-page a {
+  color: var(--accent-lt);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.policy-page a:hover { color: var(--text-1); }
+
+/* ── Analytics ──────────────────────────────────────────── */
+.analytics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.analytics__top-page {
+  font-size: 1.1rem !important;
+  word-break: break-all;
+}
+.analytics__chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 220px;
+  overflow-x: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--bg-4);
+  border-radius: 3px;
+  padding: 1.5rem 0.75rem 0;
+}
+.analytics__bar-col {
+  flex: 1;
+  min-width: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.analytics__bar {
+  width: 100%;
+  max-width: 36px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+.analytics__bar-col:hover .analytics__bar {
+  background: var(--accent-lt);
+}
+.analytics__bar-value {
+  font-size: 0.6rem;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.analytics__bar-label {
+  font-size: 0.55rem;
+  color: var(--text-3);
+  white-space: nowrap;
+  padding-top: 4px;
+  min-height: 1rem;
+}
+.analytics__page-bar-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.analytics__page-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
 }
 

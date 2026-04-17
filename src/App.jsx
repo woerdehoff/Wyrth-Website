@@ -16,6 +16,10 @@ import Admin from './pages/Admin'
 import Shop from './pages/Shop'
 import ShopSuccess from './pages/ShopSuccess'
 import ShopCancel from './pages/ShopCancel'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import RefundPolicy from './pages/RefundPolicy'
+import ShippingPolicy from './pages/ShippingPolicy'
+import TermsOfService from './pages/TermsOfService'
 
 function PublicSite() {
   return (
@@ -50,18 +54,42 @@ function ScrollToHash() {
   return null
 }
 
+function PageTracker() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin')) return
+    const url = import.meta.env.VITE_CONTENT_API_URL
+    if (!url) return
+
+    fetch(`${url}/analytics/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: location.pathname }),
+      keepalive: true,
+    }).catch(() => {})
+  }, [location.pathname])
+
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
         <ContentProvider>
           <ScrollToHash />
+          <PageTracker />
           <Routes>
-            <Route path="/admin"         element={<Admin />} />
-            <Route path="/shop/success"  element={<ShopSuccess />} />
-            <Route path="/shop/cancel"   element={<ShopCancel />} />
-            <Route path="/shop"          element={<Shop />} />
-            <Route path="*"              element={<PublicSite />} />
+            <Route path="/admin"            element={<Admin />} />
+            <Route path="/shop/success"     element={<ShopSuccess />} />
+            <Route path="/shop/cancel"      element={<ShopCancel />} />
+            <Route path="/shop"             element={<Shop />} />
+            <Route path="/privacy-policy"   element={<PrivacyPolicy />} />
+            <Route path="/refund-policy"    element={<RefundPolicy />} />
+            <Route path="/shipping-policy"  element={<ShippingPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="*"                 element={<PublicSite />} />
           </Routes>
           <CartDrawer />
         </ContentProvider>

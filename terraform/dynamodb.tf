@@ -57,3 +57,31 @@ resource "aws_dynamodb_table" "carts" {
     Environment = "production"
   }
 }
+
+resource "aws_dynamodb_table" "analytics" {
+  name         = "${var.project_name}-analytics"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-analytics"
+    Project     = var.project_name
+    Environment = "production"
+  }
+}

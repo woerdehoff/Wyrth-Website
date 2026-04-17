@@ -16,10 +16,8 @@ export default function Statement() {
         <p className="statement__attr">— WYRTH</p>
 
         <a
-          href="https://wyrthco.com/products/salon-cape"
+          href="/shop"
           className="btn btn--gold"
-          target="_blank"
-          rel="noopener noreferrer"
         >
           Shop the Cape
         </a>

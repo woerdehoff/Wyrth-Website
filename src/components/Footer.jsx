@@ -2,17 +2,17 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 
 const SHOP = [
-  { label: 'The Cape',     href: 'https://wyrthco.com/products/salon-cape' },
-  { label: 'For Barbers',  href: 'https://wyrthco.com/pages/barber-cape' },
-  { label: 'Bundles',      href: 'https://wyrthco.com/pages/bundles' },
-  { label: 'Custom Capes', href: 'https://wyrthco.com/pages/custom-logo-capes' },
+  { label: 'The Cape',     href: '/shop' },
+  { label: 'For Barbers',  href: '/shop' },
+  { label: 'Bundles',      href: '/shop' },
+  { label: 'Custom Capes', href: '/shop' },
 ]
 
 const POLICIES = [
-  { label: 'Privacy Policy',   href: 'https://wyrthco.com/policies/privacy-policy' },
-  { label: 'Refund Policy',    href: 'https://wyrthco.com/policies/refund-policy' },
-  { label: 'Shipping Policy',  href: 'https://wyrthco.com/policies/shipping-policy' },
-  { label: 'Terms of Service', href: 'https://wyrthco.com/policies/terms-of-service' },
+  { label: 'Privacy Policy',   href: '/privacy-policy' },
+  { label: 'Refund Policy',    href: '/refund-policy' },
+  { label: 'Shipping Policy',  href: '/shipping-policy' },
+  { label: 'Terms of Service', href: '/terms-of-service' },
 ]
 
 export default function Footer() {
@@ -35,7 +35,7 @@ export default function Footer() {
           <ul>
             {SHOP.map(l => (
               <li key={l.label}>
-                <a href={l.href} target="_blank" rel="noopener noreferrer">
+                <a href={l.href}>
                   {l.label}
                 </a>
               </li>
@@ -48,7 +48,7 @@ export default function Footer() {
           <ul>
             {POLICIES.map(l => (
               <li key={l.label}>
-                <a href={l.href} target="_blank" rel="noopener noreferrer">
+                <a href={l.href}>
                   {l.label}
                 </a>
               </li>
@@ -84,7 +84,7 @@ export default function Footer() {
 
       <div className="footer__bottom">
         <span>© 2026 WYRTH. All rights reserved.</span>
-        <a href="https://wyrthco.com" target="_blank" rel="noopener noreferrer">
+        <a href="/">
           wyrthco.com
         </a>
       </div>
