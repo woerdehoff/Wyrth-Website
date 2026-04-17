@@ -19,6 +19,24 @@ pipeline {
       }
     }
 
+    stage('Terraform Init') {
+      steps {
+        sh '''
+          cd terraform
+          terraform init
+        '''
+      }
+    }
+
+    stage('Terraform Plan') {
+      steps {
+        sh '''
+          cd terraform
+          terraform plan
+        '''
+      }
+    }
+
     stage('Install Dependencies') {
       steps {
         sh '''
