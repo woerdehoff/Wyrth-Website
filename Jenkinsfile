@@ -13,23 +13,25 @@ pipeline {
         sh '''
           whoami
           pwd
-          node --version
-          npm --version
-          terraform version || echo "Terraform not found yet"
-          aws --version || echo "AWS CLI not found yet"
+          /usr/bin/node-22 -v
+          /usr/bin/npm-22 -v
         '''
       }
     }
 
     stage('Install Dependencies') {
       steps {
-        sh 'npm install --legacy-peer-deps'
+        sh '''
+          /usr/bin/npm-22 install --legacy-peer-deps
+        '''
       }
     }
 
     stage('Build') {
       steps {
-        sh 'npm run build'
+        sh '''
+          /usr/bin/npm-22 run build
+        '''
       }
     }
   }
