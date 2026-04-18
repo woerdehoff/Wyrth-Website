@@ -85,3 +85,25 @@ resource "aws_dynamodb_table" "analytics" {
     Environment = var.environment
   }
 }
+
+resource "aws_dynamodb_table" "magic_tokens" {
+  name         = "${var.project_name}-magic-tokens"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "token"
+
+  attribute {
+    name = "token"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-magic-tokens"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}

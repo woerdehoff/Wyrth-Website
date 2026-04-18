@@ -65,3 +65,16 @@ variable "environment" {
     error_message = "environment must be one of: dev, test, prod"
   }
 }
+
+variable "ses_from_email" {
+  description = "SES verified From address for sending magic link emails (e.g. noreply@wyrth.co)"
+  type        = string
+  default     = ""
+}
+
+variable "jwt_secret" {
+  description = "Secret key for signing magic link session JWTs — min 32 chars, keep this out of VCS"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

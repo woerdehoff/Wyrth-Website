@@ -2,11 +2,13 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand, UpdateItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { createPublicKey, createVerify, createHmac, createHash, timingSafeEqual, randomUUID } from 'node:crypto'
 
 const s3  = new S3Client({})
 const cf  = new CloudFrontClient({ region: 'us-east-1' })
 const ddb = new DynamoDBClient({})
+const ses = new SESv2Client({ region: 'us-east-1' })
 
 const BUCKET                = process.env.BUCKET_NAME
 const DISTRIBUTION_ID       = process.env.CLOUDFRONT_DISTRIBUTION_ID
@@ -20,6 +22,29 @@ const CARTS_TABLE           = process.env.CARTS_TABLE
 const ANALYTICS_TABLE       = process.env.ANALYTICS_TABLE
 const SITE_URL              = process.env.SITE_URL
 const GOOGLE_CLIENT_ID      = process.env.GOOGLE_CLIENT_ID
+const MAGIC_TOKENS_TABLE    = process.env.MAGIC_TOKENS_TABLE
+const SES_FROM_EMAIL        = process.env.SES_FROM_EMAIL
+const JWT_SECRET            = process.env.JWT_SECRET || ''
+
+// ── HMAC-HS256 JWT helpers (for self-issued magic link sessions) ──────
+function signHs256Jwt(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+  const body   = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig    = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+  return `${header}.${body}.${sig}`
+}
+
+function verifyHs256Jwt(token) {
+  const parts = token.split('.')
+  if (parts.length !== 3) throw new Error('Malformed JWT')
+  const expected = createHmac('sha256', JWT_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url')
+  const expBuf   = Buffer.from(expected)
+  const actBuf   = Buffer.from(parts[2])
+  if (expBuf.length !== actBuf.length || !timingSafeEqual(expBuf, actBuf)) throw new Error('Invalid signature')
+  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired')
+  return payload
+}
 
 // ── JWKS caches ───────────────────────────────────────────────────────
 let entraJwksCache     = null, entraJwksCacheTime = 0
@@ -546,6 +571,98 @@ async function handleGetAnalytics(event) {
   }
 }
 
+// ── Route: POST /auth/magic/send ──────────────────────────────────────
+async function handleMagicLinkSend(event) {
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+
+  const email = (body.email || '').trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Valid email required' }) }
+  }
+
+  if (!SES_FROM_EMAIL || !MAGIC_TOKENS_TABLE || !JWT_SECRET) {
+    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Magic link not configured' }) }
+  }
+
+  const token = randomUUID()
+  const ttl   = Math.floor(Date.now() / 1000) + 900 // 15 minutes
+
+  await ddb.send(new PutItemCommand({
+    TableName: MAGIC_TOKENS_TABLE,
+    Item: marshal({ token, email, ttl }),
+  }))
+
+  const link = `${SITE_URL}/auth/verify?token=${token}`
+
+  await ses.send(new SendEmailCommand({
+    FromEmailAddress: SES_FROM_EMAIL,
+    Destination: { ToAddresses: [email] },
+    Content: {
+      Simple: {
+        Subject: { Data: 'Sign in to Wyrth', Charset: 'UTF-8' },
+        Body: {
+          Text: {
+            Data: `Click the link below to sign in to Wyrth. This link expires in 15 minutes.\n\n${link}\n\nIf you did not request this, you can safely ignore this email.`,
+            Charset: 'UTF-8',
+          },
+          Html: {
+            Data: `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#111"><h2 style="margin-bottom:8px">Sign in to Wyrth</h2><p>Click the button below to sign in. This link expires in <strong>15 minutes</strong>.</p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:6px;margin:16px 0;font-weight:600">Sign in to Wyrth</a><p style="color:#666;font-size:13px;margin-top:24px">If you did not request this email, you can safely ignore it.</p></body></html>`,
+            Charset: 'UTF-8',
+          },
+        },
+      },
+    },
+  }))
+
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+}
+
+// ── Route: GET /auth/magic/verify ─────────────────────────────────────
+async function handleMagicLinkVerify(event) {
+  const token = event.queryStringParameters?.token || ''
+  if (!token) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Token required' }) }
+  }
+
+  if (!MAGIC_TOKENS_TABLE || !JWT_SECRET) {
+    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Magic link not configured' }) }
+  }
+
+  const result = await ddb.send(new GetItemCommand({
+    TableName: MAGIC_TOKENS_TABLE,
+    Key: { token: { S: token } },
+  }))
+
+  if (!result.Item) {
+    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired link' }) }
+  }
+
+  const item = unmarshal(result.Item)
+  if (item.ttl < Math.floor(Date.now() / 1000)) {
+    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Link expired' }) }
+  }
+
+  // Single-use: delete the token immediately
+  await ddb.send(new DeleteItemCommand({
+    TableName: MAGIC_TOKENS_TABLE,
+    Key: { token: { S: token } },
+  }))
+
+  const now = Math.floor(Date.now() / 1000)
+  const jwt = signHs256Jwt({
+    sub:   item.email,
+    email: item.email,
+    name:  '',
+    iat:   now,
+    exp:   now + 30 * 24 * 60 * 60, // 30 days
+  })
+
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ jwt }) }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method
@@ -576,6 +693,9 @@ export const handler = async (event) => {
 
     if (path === '/analytics/track' && method === 'POST') return await handleTrack(event)
     if (path === '/analytics'       && method === 'GET')  return await handleGetAnalytics(event)
+
+    if (path === '/auth/magic/send'   && method === 'POST') return await handleMagicLinkSend(event)
+    if (path === '/auth/magic/verify' && method === 'GET')  return await handleMagicLinkVerify(event)
 
     return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Not found' }) }
   } catch (err) {

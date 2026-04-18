@@ -2353,6 +2353,90 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   justify-content: center;
 }
 
+/* ── Sign In dropdown ────────────────────────────────────── */
+.nav__signin-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.nav__signin-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid var(--border-warm);
+  border-radius: 2px;
+  color: var(--text-2);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-family: inherit;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.nav__signin-trigger:hover { color: var(--text-1); border-color: var(--text-3); }
+.nav__signin-chevron {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.nav__signin-trigger[aria-expanded="true"] .nav__signin-chevron {
+  transform: rotate(180deg);
+}
+.nav__signin-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border-warm);
+  border-radius: 3px;
+  padding: 0.6rem;
+  min-width: 230px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation: signin-drop 0.15s ease both;
+}
+@keyframes signin-drop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.nav__signin-item {
+  display: flex;
+  flex-direction: column;
+}
+.nav__signin-item + .nav__signin-item {
+  border-top: 1px solid var(--border);
+  padding-top: 0.4rem;
+}
+.nav__signin-email-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: 1px solid var(--border-warm);
+  border-radius: 2px;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-family: inherit;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+.nav__signin-email-btn:hover { background: var(--bg-3); color: var(--text-1); }
+.nav__signin-email-btn svg {
+  width: 15px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
 /* Mobile menu sign-in / user items (hidden on desktop, shown inside hamburger menu) */
 .nav__links-signin,
 .nav__links-user {
@@ -2366,6 +2450,11 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
     margin-top: 1rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--border, #1e1e1e);
+  }
+  .nav__links-signin + .nav__links-signin {
+    margin-top: 0;
+    padding-top: 0.75rem;
+    border-top: none;
   }
   .nav__links-user button {
     display: flex;
@@ -2391,6 +2480,8 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
     width: 24px;
     height: 24px;
   }
+  /* Hide desktop-only sign-in dropdown on mobile */
+  .nav__signin-dropdown { display: none; }
 }
 
 /* ── Shop login prompt ───────────────────────────────────── */
@@ -2835,3 +2926,133 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
   transition: width 0.3s ease;
 }
 
+
+/* ── Magic Link Modal ─────────────────────────────────────── */
+.magic-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: modal-fade 0.18s ease both;
+}
+.magic-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2rem 2rem 1.75rem;
+  max-width: 400px;
+  width: 100%;
+  position: relative;
+  animation: modal-up 0.2s ease both;
+}
+.magic-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.9rem;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.magic-modal__close:hover { color: var(--text-1); }
+.magic-modal__title {
+  font-family: var(--ff-display);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--text-1);
+  margin: 0 0 0.6rem;
+}
+.magic-modal__body {
+  font-size: 0.875rem;
+  color: var(--text-2);
+  line-height: 1.65;
+  margin: 0 0 1.25rem;
+}
+.magic-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.magic-modal__input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-1);
+  font-size: 0.9rem;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.magic-modal__input:focus { border-color: var(--accent); }
+.magic-modal__input::placeholder { color: var(--text-3); }
+.magic-modal__error {
+  font-size: 0.8rem;
+  color: #e05c5c;
+  margin: 0;
+}
+.magic-modal__btn {
+  padding: 0.7rem 1.25rem;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.magic-modal__btn:hover:not(:disabled) { opacity: 0.88; }
+.magic-modal__btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Verify Magic Link page ───────────────────────────────── */
+.verify-magic {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+.verify-magic__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.verify-magic__msg {
+  font-size: 1rem;
+  color: var(--text-2);
+  text-align: center;
+  margin: 0;
+}
+.verify-magic__msg--ok  { color: var(--accent); }
+.verify-magic__msg--err { color: #e05c5c; }
+.verify-magic__back {
+  padding: 0.65rem 1.5rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.verify-magic__back:hover { background: var(--bg-4); }

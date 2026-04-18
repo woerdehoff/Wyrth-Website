@@ -20,6 +20,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import RefundPolicy from './pages/RefundPolicy'
 import ShippingPolicy from './pages/ShippingPolicy'
 import TermsOfService from './pages/TermsOfService'
+import VerifyMagicLink from './pages/VerifyMagicLink'
 
 function PublicSite() {
   return (
@@ -82,6 +83,7 @@ export default function App() {
           <PageTracker />
           <Routes>
             <Route path="/admin"            element={<Admin />} />
+            <Route path="/auth/verify"      element={<VerifyMagicLink />} />
             <Route path="/shop/success"     element={<ShopSuccess />} />
             <Route path="/shop/cancel"      element={<ShopCancel />} />
             <Route path="/shop"             element={<Shop />} />

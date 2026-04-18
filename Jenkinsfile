@@ -18,16 +18,19 @@ pipeline {
               env.TF_ENV              = 'prod'
               env.STRIPE_KEY_CRED     = 'stripe-secret-key-prod'
               env.STRIPE_WEBHOOK_CRED = 'stripe-webhook-secret-prod'
+              env.JWT_SECRET_CRED     = 'jwt-secret-prod'
               break
             case 'test':
               env.TF_ENV              = 'test'
               env.STRIPE_KEY_CRED     = 'stripe-secret-key-test'
               env.STRIPE_WEBHOOK_CRED = 'stripe-webhook-secret-test'
+              env.JWT_SECRET_CRED     = 'jwt-secret-test'
               break
             default:
               env.TF_ENV              = 'dev'
               env.STRIPE_KEY_CRED     = 'stripe-secret-key-dev'
               env.STRIPE_WEBHOOK_CRED = 'stripe-webhook-secret-dev'
+              env.JWT_SECRET_CRED     = 'jwt-secret-dev'
           }
           echo "Branch: ${branch}  →  Environment: ${env.TF_ENV}"
         }
@@ -66,7 +69,8 @@ pipeline {
         script {
           withCredentials([
             string(credentialsId: env.STRIPE_KEY_CRED,     variable: 'TF_VAR_stripe_secret_key'),
-            string(credentialsId: env.STRIPE_WEBHOOK_CRED, variable: 'TF_VAR_stripe_webhook_secret')
+            string(credentialsId: env.STRIPE_WEBHOOK_CRED, variable: 'TF_VAR_stripe_webhook_secret'),
+            string(credentialsId: env.JWT_SECRET_CRED,     variable: 'TF_VAR_jwt_secret')
           ]) {
             dir('terraform') {
               sh "terraform plan -var-file=\"${env.TF_ENV}.tfvars\" -out=tfplan"
@@ -91,7 +95,8 @@ pipeline {
         script {
           withCredentials([
             string(credentialsId: env.STRIPE_KEY_CRED,     variable: 'TF_VAR_stripe_secret_key'),
-            string(credentialsId: env.STRIPE_WEBHOOK_CRED, variable: 'TF_VAR_stripe_webhook_secret')
+            string(credentialsId: env.STRIPE_WEBHOOK_CRED, variable: 'TF_VAR_stripe_webhook_secret'),
+            string(credentialsId: env.JWT_SECRET_CRED,     variable: 'TF_VAR_jwt_secret')
           ]) {
             dir('terraform') {
               sh 'terraform apply -auto-approve tfplan'

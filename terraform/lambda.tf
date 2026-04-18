@@ -58,7 +58,13 @@ resource "aws_iam_role_policy" "content_api" {
           aws_dynamodb_table.orders.arn,
           aws_dynamodb_table.carts.arn,
           aws_dynamodb_table.analytics.arn,
+          aws_dynamodb_table.magic_tokens.arn,
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail"]
+        Resource = "*"
       },
       {
         Effect = "Allow"
@@ -105,6 +111,9 @@ resource "aws_lambda_function" "content_api" {
       SITE_URL                   = local.site_url
       GOOGLE_CLIENT_ID           = var.google_client_id
       CLOUDFRONT_DOMAIN          = aws_cloudfront_distribution.website.domain_name
+      MAGIC_TOKENS_TABLE         = aws_dynamodb_table.magic_tokens.name
+      SES_FROM_EMAIL             = var.ses_from_email
+      JWT_SECRET                 = var.jwt_secret
     }
   }
 }
