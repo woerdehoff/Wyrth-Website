@@ -8,7 +8,7 @@ resource "aws_s3_bucket" "website" {
   tags = {
     Name        = "${var.project_name}-bucket"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 }
 

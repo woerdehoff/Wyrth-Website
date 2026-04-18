@@ -54,3 +54,14 @@ variable "google_client_id" {
   type        = string
   default     = ""
 }
+
+variable "environment" {
+  description = "Deployment environment — controls resource tags and naming"
+  type        = string
+  default     = "prod"
+
+  validation {
+    condition     = contains(["dev", "test", "prod"], var.environment)
+    error_message = "environment must be one of: dev, test, prod"
+  }
+}

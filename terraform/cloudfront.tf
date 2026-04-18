@@ -64,7 +64,7 @@ resource "aws_cloudfront_distribution" "website" {
   tags = {
     Name        = "${var.project_name}-distribution"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 
   depends_on = [aws_s3_bucket_policy.website]

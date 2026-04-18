@@ -15,7 +15,7 @@ resource "aws_dynamodb_table" "products" {
   tags = {
     Name        = "${var.project_name}-products"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 }
 
@@ -32,7 +32,7 @@ resource "aws_dynamodb_table" "orders" {
   tags = {
     Name        = "${var.project_name}-orders"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 }
 
@@ -54,7 +54,7 @@ resource "aws_dynamodb_table" "carts" {
   tags = {
     Name        = "${var.project_name}-carts"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 }
 
@@ -82,6 +82,6 @@ resource "aws_dynamodb_table" "analytics" {
   tags = {
     Name        = "${var.project_name}-analytics"
     Project     = var.project_name
-    Environment = "production"
+    Environment = var.environment
   }
 }
