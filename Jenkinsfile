@@ -115,10 +115,12 @@ pipeline {
             env.VITE_CONTENT_API_URL  = sh(script: 'terraform output -raw content_api_url',  returnStdout: true).trim()
             env.VITE_GOOGLE_CLIENT_ID = sh(script: 'terraform output -raw google_client_id', returnStdout: true).trim()
           }
+          env.VITE_APP_ENV = env.TF_ENV == 'prod' ? '' : " · ${env.TF_ENV.toUpperCase()}"
         }
         sh '''
           VITE_CONTENT_API_URL="${VITE_CONTENT_API_URL}" \
           VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
+          VITE_APP_ENV="${VITE_APP_ENV}" \
           /usr/bin/npm-22 run build
         '''
       }
