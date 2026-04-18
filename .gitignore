@@ -3,6 +3,9 @@ dist/
 .env
 *.tfvars
 !terraform/example.tfvars
+!terraform/dev.tfvars
+!terraform/test.tfvars
+!terraform/prod.tfvars
 terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup

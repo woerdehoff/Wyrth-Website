@@ -11,7 +11,9 @@ pipeline {
     stage('Set Environment') {
       steps {
         script {
-          switch (env.BRANCH_NAME) {
+          // GIT_BRANCH is set by the git plugin as "origin/main" — strip the prefix
+          def branch = (env.GIT_BRANCH ?: '').replaceFirst(/^(refs\/heads\/|origin\/)/, '')
+          switch (branch) {
             case 'main':
               env.TF_ENV              = 'prod'
               env.STRIPE_KEY_CRED     = 'stripe-secret-key-prod'
@@ -27,7 +29,7 @@ pipeline {
               env.STRIPE_KEY_CRED     = 'stripe-secret-key-dev'
               env.STRIPE_WEBHOOK_CRED = 'stripe-webhook-secret-dev'
           }
-          echo "Branch: ${env.BRANCH_NAME}  →  Environment: ${env.TF_ENV}"
+          echo "Branch: ${branch}  →  Environment: ${env.TF_ENV}"
         }
       }
     }
