@@ -13,6 +13,10 @@ entra_client_id  = "8938c729-223c-4481-8a20-34a5694b825f"
 google_client_id = "775161725783-6ttorf72d49ahohp6ci8oc7bed88k650.apps.googleusercontent.com"
 ses_from_email   = "noreply@wyrth.co"
 
+domain_aliases      = ["www.wyrthco.com"]
+acm_certificate_arn = "arn:aws:acm:us-east-1:042470865429:certificate/ba510d15-4dbd-4cef-8e1d-95d6ae5540c9"
+site_url            = "https://www.wyrthco.com"
+
 # stripe_secret_key     — injected by Jenkins (stripe-secret-key-prod credential)
 # stripe_webhook_secret — injected by Jenkins (stripe-webhook-secret-prod credential)
 # jwt_secret            — injected by Jenkins (jwt-secret-prod credential)

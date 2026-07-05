@@ -49,6 +49,18 @@ variable "site_url" {
   default     = ""
 }
 
+variable "domain_aliases" {
+  description = "Custom domain names for the CloudFront distribution (e.g. dev.wyrthco.com). Requires acm_certificate_arn."
+  type        = list(string)
+  default     = []
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN in us-east-1 for the custom domain. Use *.wyrthco.com for subdomains."
+  type        = string
+  default     = ""
+}
+
 variable "google_client_id" {
   description = "Google OAuth 2.0 client ID (from console.cloud.google.com)"
   type        = string

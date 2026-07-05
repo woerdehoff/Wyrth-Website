@@ -20,4 +20,6 @@ stripe_webhook_secret = "whsec_YOUR_WEBHOOK_SIGNING_SECRET"
 google_client_id = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
 
 # Optional: override the Stripe redirect URL (defaults to CloudFront URL)
-# site_url = "https://wyrthco.com"
+# site_url            = "https://www.wyrthco.com"
+# domain_aliases      = ["www.wyrthco.com"]
+# acm_certificate_arn = "arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT-ID"
