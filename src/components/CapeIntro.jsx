@@ -10,7 +10,7 @@ export default function CapeIntro() {
         <div className="cape__image-wrap">
           <img
             className="cape__image"
-            src="https://wyrthco.com/cdn/shop/files/764D6C79-E655-4BF0-9785-D406A1C59941_67354133-d0c7-43d3-b000-5b9c5f4b722c.jpg"
+            src="/images/cape-barber.jpg"
             alt="Barber demonstrating the Wyrth cape's lower-neck access technique"
             loading="lazy"
           />

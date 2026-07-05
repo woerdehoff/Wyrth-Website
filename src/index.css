@@ -220,7 +220,7 @@ h1, h2, h3 { font-family: var(--ff-display); font-weight: 400; line-height: 1.1;
       rgba(6, 6, 6, 0.78) 55%,
       rgba(6, 6, 6, 1) 100%
     ),
-    url('https://wyrthco.com/cdn/shop/files/764D6C79-E655-4BF0-9785-D406A1C59941_67354133-d0c7-43d3-b000-5b9c5f4b722c.jpg');
+    url('/images/cape-barber.jpg');
   background-size: cover;
   background-position: center 25%;
 }
