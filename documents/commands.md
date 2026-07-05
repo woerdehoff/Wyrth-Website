@@ -5,23 +5,36 @@
     Generate a JWT secret (run 3x for prod/test/dev)
         openssl rand -hex 32
 
-- Jenkins Credentials (Secret text) required per environment
-    stripe-secret-key-prod / -test / -dev
-    stripe-webhook-secret-prod / -test / -dev
-    jwt-secret-prod / -test / -dev
+- Secrets for deploy (set via environment variables)
+    STRIPE_SECRET_KEY
+    STRIPE_WEBHOOK_SECRET
+    JWT_SECRET
 
-- Git
-    # Work on dev. Jenkins deploys automatically on push.
-    git checkout dev
+    Generate a JWT secret:
+        openssl rand -hex 32
+
+    Example full command:
+        STRIPE_SECRET_KEY=sk_xxx STRIPE_WEBHOOK_SECRET=whsec_xxx JWT_SECRET=... \
+        ./deploy.sh --env prod --yes
+
+
+- Git + Deploy (terminal, trunk-based)
+    # Work on main (or short-lived feature branches)
+    git checkout main
     git add .
     git commit -m "feat: your change"
     git push
 
-    # Promote dev → test (triggers test deploy in Jenkins)
-    git checkout test && git merge dev && git push
+    # Deploy explicitly to any environment — branch no longer decides the target
+    npm run deploy:dev
+    npm run deploy:test
+    npm run deploy:prod
 
-    # Promote test → prod (triggers prod deploy — requires manual approval in Jenkins)
-    git checkout main && git merge test && git push
+    # You can also deploy from any branch or commit
+    ./deploy.sh --env dev
+    ./deploy.sh --env test
+    ./deploy.sh --env prod --yes
+
 
 - Local Dev
     VITE_CONTENT_API_URL="https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com/" \
@@ -29,5 +42,18 @@
     npm run dev
     # Admin at: http://localhost:5173/admin
 
-- Manual Deploy (prod — bypasses Jenkins, use for quick fixes)
-    cd /Users/adam/Documents/GitHub/Wyrth-Website && ./deploy.sh
+- Deploy from terminal (supports dev / test / prod)
+    ./deploy.sh --env dev
+    ./deploy.sh --env test
+    ./deploy.sh --env prod
+
+    Or use npm convenience scripts:
+    npm run deploy:dev
+    npm run deploy:test
+    npm run deploy:prod
+
+    Plan only (no apply):
+    ./deploy.sh --env dev --plan
+
+    Full help:
+    ./deploy.sh --help

@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------
-# dev.tfvars — Development environment (branch: develop / feature/*)
-# Used by Jenkins: terraform apply -var-file=dev.tfvars
+# dev.tfvars — Development environment
+# Used with: ./deploy.sh --env dev   (or terraform apply -var-file=dev.tfvars)
 # -----------------------------------------------------------------------
 
 aws_region       = "us-east-1"
@@ -13,7 +13,7 @@ entra_client_id  = "8938c729-223c-4481-8a20-34a5694b825f"
 google_client_id = "775161725783-6ttorf72d49ahohp6ci8oc7bed88k650.apps.googleusercontent.com"
 ses_from_email   = "noreply@wyrth.co"
 
-# stripe_secret_key     — injected by Jenkins (stripe-secret-key-dev credential)
-# stripe_webhook_secret — injected by Jenkins (stripe-webhook-secret-dev credential)
-# jwt_secret            — injected by Jenkins (jwt-secret-dev credential)
+# Secrets (stripe + jwt) are supplied at deploy time.
 # Use sk_test_... / whsec_... test keys for this environment.
+# Provide via env vars when running ./deploy.sh --env dev
+# or create terraform/secrets-dev.tfvars (gitignored)

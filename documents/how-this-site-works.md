@@ -27,11 +27,11 @@ The Wyrth-Website is a static React app hosted on AWS. It is a premium editorial
 
 Three environments are deployed to the same AWS account. Each has its own S3 bucket, CloudFront distribution, Lambda, API Gateway, and DynamoDB tables.
 
-| Environment | Branch | S3 Bucket | CloudFront | Content API |
-|---|---|---|---|---|
-| **prod** | `main` | `wyrthco-website` | `E18DWUHK7XG807` | `https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com` |
-| **test** | `test` | `wyrthco-website-test` | (see Jenkins) | (see Jenkins) |
-| **dev** | `dev` | `wyrthco-website-dev` | `EJTKH2O123SKG` | `https://54roo7ti6d.execute-api.us-east-1.amazonaws.com` |
+| Environment | S3 Bucket | CloudFront | Content API |
+|---|---|---|---|
+| **prod** | `wyrthco-website` | `E18DWUHK7XG807` | `https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com` |
+| **test** | `wyrthco-website-test` | (varies) | (varies) |
+| **dev** | `wyrthco-website-dev` | `EJTKH2O123SKG` | `https://54roo7ti6d.execute-api.us-east-1.amazonaws.com` |
 
 | Shared Resource | Value |
 |---|---|
@@ -51,39 +51,23 @@ Three environments are deployed to the same AWS account. Each has its own S3 buc
 
 ---
 
-## CI/CD Pipeline (Jenkins)
+## CI/CD (Terminal Deploy)
 
-Deployments are fully automated via a **Jenkins Multibranch Pipeline**. Pushing to any branch triggers the pipeline for that environment.
+There is no longer a Jenkins server. All deployments are done from the terminal using the provided `deploy.sh` script.
 
-### Branch → Environment mapping
+The script performs the same steps the old Jenkins pipeline used to do:
+- Correct remote Terraform state per environment
+- Injects secrets via `TF_VAR_*` environment variables (or `secrets*.tfvars`)
+- Builds the React app with the right `VITE_*` variables from Terraform outputs
+- Deploys to S3 + invalidates CloudFront
 
-| Branch | Environment | Terraform state key |
-|---|---|---|
-| `dev` (or any other) | dev | `wyrth-website/dev/terraform.tfstate` |
-| `test` | test | `wyrth-website/test/terraform.tfstate` |
-| `main` | prod | `wyrth-website/prod/terraform.tfstate` |
+### Environment mapping
 
-### Pipeline stages
-
-1. **Set Environment** — reads `GIT_BRANCH`, maps to dev/test/prod, sets credential IDs
-2. **Checkout** — checks out source
-3. **Verify Environment** — confirms Node 22, Terraform, AWS CLI
-4. **Terraform Init** — `terraform init -reconfigure -backend-config="key=wyrth-website/<env>/terraform.tfstate"`
-5. **Terraform Plan** — injects Stripe + JWT secrets from Jenkins credentials as `TF_VAR_*`
-6. **Approve Production Deploy** — manual gate for `main` only; navigate to build → *Paused for Input*
-7. **Terraform Apply** — applies the saved plan
-8. **Install Dependencies** — `npm install`
-9. **Build** — reads Terraform outputs, injects `VITE_CONTENT_API_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_APP_ENV` into the React build
-10. **Deploy to S3** — `aws s3 sync dist/ s3://<bucket> --delete`
-11. **Invalidate CloudFront** — clears CDN cache
-
-### Jenkins credentials required (Secret text — one set per environment)
-
-```
-stripe-secret-key-prod / -test / -dev
-stripe-webhook-secret-prod / -test / -dev
-jwt-secret-prod / -test / -dev
-```
+| `--env` flag | Environment | S3 Bucket | Terraform state key |
+|--------------|-------------|-----------|---------------------|
+| `dev`        | dev         | `wyrthco-website-dev` | `wyrth-website/dev/terraform.tfstate` |
+| `test`       | test        | `wyrthco-website-test` | `wyrth-website/test/terraform.tfstate` |
+| `prod`       | prod        | `wyrthco-website` | `wyrth-website/prod/terraform.tfstate` |
 
 ### Browser tab title per environment
 
@@ -94,6 +78,33 @@ The Vite build injects a `__APP_TITLE__` constant based on `VITE_APP_ENV`:
 | prod | `WYRTH — The Capsule Wardrobe Cape` |
 | test | `WYRTH · TEST — The Capsule Wardrobe Cape` |
 | dev | `WYRTH · DEV — The Capsule Wardrobe Cape` |
+
+### Running a deployment
+
+```bash
+# Basic usage
+./deploy.sh --env dev
+./deploy.sh --env test
+./deploy.sh --env prod
+
+# Using npm scripts (convenience)
+npm run deploy:dev
+npm run deploy:test
+npm run deploy:prod
+
+# Plan only (no changes)
+./deploy.sh --env dev --plan
+
+# Supply secrets via environment (recommended)
+STRIPE_SECRET_KEY=sk_live_xxx \
+STRIPE_WEBHOOK_SECRET=whsec_xxx \
+JWT_SECRET=... \
+./deploy.sh --env prod --yes
+```
+
+See `./deploy.sh --help` for all options (`--skip-infra`, `--skip-build`, etc.).
+
+Secrets are never stored in the repository. Use environment variables or a local `terraform/secrets.tfvars` file.
 
 ---
 
@@ -205,12 +216,10 @@ Customers have two sign-in options — both are passwordless:
 ### Magic Link setup (one-time)
 
 1. **Verify the From address in AWS SES** — go to SES → Verified identities → verify `noreply@wyrth.co` (or the domain)
-2. **Create Jenkins credentials** (Secret text) for each environment:
-   - `jwt-secret-prod` — `openssl rand -hex 32`
-   - `jwt-secret-test` — `openssl rand -hex 32`
-   - `jwt-secret-dev` — `openssl rand -hex 32`
-3. Jenkins injects each secret as `TF_VAR_jwt_secret` during Terraform plan/apply (same pattern as Stripe keys)
-4. `ses_from_email` is already set to `noreply@wyrth.co` in all `.tfvars` files
+2. Supply the JWT secret at deploy time (via environment variable or `secrets.tfvars`):
+   - `JWT_SECRET=$(openssl rand -hex 32) ./deploy.sh --env prod`
+   - Same pattern for dev and test environments.
+3. `ses_from_email` is already set to `noreply@wyrth.co` in all `.tfvars` files
 
 ### Admin shop management (`/admin`)
 
@@ -237,49 +246,66 @@ Customers have two sign-in options — both are passwordless:
 
 ## How to Deploy
 
-Normal deployments go through Jenkins — push to a branch and the pipeline runs automatically. `deploy.sh` is available for quick manual prod patches that don't need infrastructure changes.
+All deployments are now performed from the terminal using `./deploy.sh`.
 
-### Normal workflow (Jenkins)
+### Recommended workflow (trunk-based)
 
-```bash
-# 1. Develop on dev branch
-git checkout dev
-# ... make changes ...
-git add . && git commit -m "feat: your change" && git push
-# Jenkins deploys to dev automatically
+Since deployment is now explicit via `--env`, you no longer need to maintain separate long-lived branches just to trigger different environments.
 
-# 2. Promote to test
-git checkout test && git merge dev && git push
-
-# 3. Promote to prod (Jenkins will pause for manual approval)
-git checkout main && git merge test && git push
-```
-
-### Manual deploy (prod only — skips Jenkins)
+A simple workflow:
 
 ```bash
-./deploy.sh
+# 1. Work on main (or a short-lived feature branch)
+git checkout main
+# make changes...
+git add . && git commit -m "feat: something" && git push
+
+# 2. Deploy to dev for testing
+npm run deploy:dev
+
+# 3. When ready, deploy the same code to test
+npm run deploy:test
+
+# 4. When ready for production
+npm run deploy:prod     # includes a confirmation prompt
 ```
 
-The deploy script:
-1. Runs `terraform apply -auto-approve` (using local state / prod tfvars)
-2. Reads `s3_bucket_name`, `cloudfront_distribution_id`, and `content_api_url` from Terraform outputs
-3. Builds the React app with `VITE_CONTENT_API_URL` baked in at build time
-4. Syncs `dist/` to S3 (skips `uploads/` and `content.json`)
-5. Invalidates the entire CloudFront cache (`/*`)
+You can deploy **any commit** to **any environment** at any time:
+
+```bash
+./deploy.sh --env dev
+./deploy.sh --env test
+./deploy.sh --env prod --yes
+```
+
+Separate `dev` and `test` branches are now **optional**. You can keep them for a promotion workflow if you prefer, but they are no longer required.
+
+### Passing secrets
+
+The three sensitive values are **not** stored in git:
+
+```bash
+STRIPE_SECRET_KEY=sk_... \
+STRIPE_WEBHOOK_SECRET=whsec_... \
+JWT_SECRET=$(openssl rand -hex 32) \
+./deploy.sh --env prod
+```
+
+You can also create `terraform/secrets.tfvars` (gitignored) if you prefer a file.
 
 ### First-time environment setup
 
-For each new environment, Terraform state is stored in S3 with a per-env key.
-
 ```bash
-# Initialize with the environment key (Jenkins does this automatically)
+# The first time for any environment, Terraform will create remote state
 cd terraform
-terraform init -backend-config="key=wyrth-website/<env>/terraform.tfstate"
-terraform apply -var-file="<env>.tfvars"
+terraform init -backend-config="key=wyrth-website/dev/terraform.tfstate"
+cd ..
+
+# Then deploy normally
+./deploy.sh --env dev
 ```
 
-Fill in the per-env `.tfvars` file (e.g. `dev.tfvars`) with `entra_tenant_id`, `entra_client_id`, `google_client_id`, and `ses_from_email`. Stripe and JWT secrets are injected by Jenkins at runtime — do **not** put them in tfvars.
+The per-environment `.tfvars` files (`dev.tfvars`, `test.tfvars`, `prod.tfvars`) contain the non-secret values and are committed. Secrets must be supplied at deploy time via `TF_VAR_*` (the script maps common env var names) or a local secrets file.
 
 ### Running locally
 
@@ -297,8 +323,8 @@ npm run dev
 
 ```
 Wyrth-Website/
-├── deploy.sh                       ← Manual build + deploy (prod only — Jenkins handles normal deployments)
-├── Jenkinsfile                     ← Jenkins Multibranch Pipeline definition (all stages)
+├── deploy.sh                       ← Multi-env terminal deploy (replaces Jenkins)
+├── Jenkinsfile                     ← (deprecated) old Jenkins pipeline — safe to ignore
 ├── vite.config.js                  ← Reads VITE_APP_ENV to set browser tab title at build time
 ├── src/
 │   ├── content.js                  ← Default text for every section (fallback)
@@ -374,7 +400,7 @@ All resources below are created per environment. The prod names are shown; dev a
 - Magic link tokens are **single-use** — deleted from DynamoDB on first verification
 - Magic link tokens expire in **15 minutes**; session JWTs last 30 days
 - JWT validation uses **Node.js built-in `node:crypto`** — no external npm dependencies in Lambda
-- `JWT_SECRET` is injected at deploy time by Jenkins (never stored in code or tfvars)
+- `JWT_SECRET` must be supplied at deploy time via env var or secrets file (never stored in code or committed tfvars)
 - Token claims validated: algorithm, expiry (`exp`), not-before (`nbf`), audience (`aud === CLIENT_ID`), issuer (`iss`)
 - JWT validation uses **Node.js built-in `node:crypto`** — no external npm dependencies in Lambda
 - JWKS keys are **cached for 1 hour** in Lambda module scope (warm reuse)

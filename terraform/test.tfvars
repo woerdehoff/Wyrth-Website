@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------
-# test.tfvars — Test / staging environment (branch: test)
-# Used by Jenkins: terraform apply -var-file=test.tfvars
+# test.tfvars — Test / staging environment
+# Used with: ./deploy.sh --env test   (or terraform apply -var-file=test.tfvars)
 # -----------------------------------------------------------------------
 
 aws_region       = "us-east-1"

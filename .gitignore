@@ -6,6 +6,11 @@ dist/
 !terraform/dev.tfvars
 !terraform/test.tfvars
 !terraform/prod.tfvars
+
+# Never commit local secret overrides or active tfvars
+terraform/secrets*.tfvars
+terraform/terraform.tfvars
+
 terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup

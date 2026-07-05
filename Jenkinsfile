@@ -1,3 +1,11 @@
+// ---------------------------------------------------------------------------
+// DEPRECATED — Jenkins server has been removed.
+// This file is kept only for historical reference.
+//
+// All deployments are now performed from the terminal using ./deploy.sh
+// See documents/how-this-site-works.md for the current process.
+// ---------------------------------------------------------------------------
+
 pipeline {
   agent any
 

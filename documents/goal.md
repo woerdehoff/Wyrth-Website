@@ -11,19 +11,22 @@ Beat $41 a month Shopify cost using a self-hosted AWS shop.
 
 ## TODO: Wire in Stripe (when ready)
 1. Create a Stripe account at [stripe.com](https://stripe.com)
-2. Add the live keys to Jenkins as **Secret Text** credentials:
-   - `stripe-secret-key-prod` → `sk_live_...`
-   - `stripe-webhook-secret-prod` → `whsec_...` (fill in after step 4)
-   - For test/dev environments use `sk_test_...` keys
+2. Supply secrets at deploy time (environment variables or `secrets.tfvars`):
+   ```
+   STRIPE_SECRET_KEY=sk_live_... \
+   STRIPE_WEBHOOK_SECRET=whsec_... \
+   ./deploy.sh --env prod
+   ```
+   For test/dev use `sk_test_...` keys.
 3. Add to `terraform/prod.tfvars`:
    ```
    site_url = "https://d1detsumoaola0.cloudfront.net"
    ```
-4. Push to `main` — Jenkins injects the Stripe credentials as `TF_VAR_*` during Terraform apply
+4. Run `./deploy.sh --env prod` (or `npm run deploy:prod`)
 5. In Stripe Dashboard → **Webhooks** → Add endpoint:
-   - URL: `https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com/shop/webhook`
+   - URL: `<your-api-url>/shop/webhook`  (see terraform output content_api_url)
    - Event: `checkout.session.completed`
-6. Copy the webhook signing secret into Jenkins credential `stripe-webhook-secret-prod` → push again
+6. Re-deploy after configuring the webhook secret.
 7. Test with Stripe's test card (`4242 4242 4242 4242`) on dev environment before going live
 
 ## TODO: Custom domain (when ready)

@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------
-# prod.tfvars — Production environment (branch: main)
-# Used by Jenkins: terraform apply -var-file=prod.tfvars
+# prod.tfvars — Production environment
+# Used with: ./deploy.sh --env prod   (or terraform apply -var-file=prod.tfvars)
 # -----------------------------------------------------------------------
 
 aws_region       = "us-east-1"

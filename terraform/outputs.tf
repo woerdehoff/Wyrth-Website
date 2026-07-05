@@ -36,3 +36,18 @@ output "google_client_id" {
   description = "Google OAuth client ID passed to the React build"
   value       = var.google_client_id
 }
+
+output "entra_tenant_id" {
+  description = "Microsoft Entra tenant ID (for frontend MSAL config)"
+  value       = var.entra_tenant_id
+}
+
+output "entra_client_id" {
+  description = "Microsoft Entra client ID (for frontend MSAL config)"
+  value       = var.entra_client_id
+}
+
+output "ses_from_email" {
+  description = "SES from address"
+  value       = var.ses_from_email
+}
