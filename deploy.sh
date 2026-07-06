@@ -179,6 +179,8 @@ if ! $SKIP_INFRA; then
   echo
 else
   echo "→ Skipping Terraform ( --skip-infra )"
+  echo "→ Initializing Terraform backend (for outputs)..."
+  terraform init -reconfigure -backend-config="key=${BACKEND_KEY}" -input=false > /dev/null
 fi
 
 # --- Capture outputs for the React build -------------------------------

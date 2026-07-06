@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 
@@ -11,7 +10,7 @@ function formatPrice(cents) {
 }
 
 export default function CartDrawer() {
-  const { user, login, logout, googleClientId, token } = useAuth()
+  const { token } = useAuth()
   const { items, count, total, open, setOpen, removeItem, updateQty, clearCart } = useCart()
   const overlayRef = useRef(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -73,30 +72,8 @@ export default function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="cart-drawer__empty">
-            {!user ? (
-              <>
-                <p className="cart-drawer__empty-title">Sign in to shop</p>
-                <p className="cart-drawer__empty-sub">Use your Google account to add items and save your cart.</p>
-                {googleClientId ? (
-                  <GoogleLogin
-                    onSuccess={resp => login(resp.credential)}
-                    onError={() => {}}
-                    theme="filled_black"
-                    shape="rectangular"
-                    text="signin_with"
-                    size="large"
-                  />
-                ) : (
-                  <p className="cart-drawer__empty-sub">Google login not configured yet.</p>
-                )}
-                <Link to="/shop" className="cart-drawer__empty-link" onClick={() => setOpen(false)}>Browse the collection →</Link>
-              </>
-            ) : (
-              <>
-                <p>Your cart is empty.</p>
-                <Link to="/shop" className="btn btn--gold" onClick={() => setOpen(false)}>Shop the Cape</Link>
-              </>
-            )}
+            <p>Your cart is empty.</p>
+            <Link to="/shop" className="btn btn--gold" onClick={() => setOpen(false)}>Shop the Cape</Link>
           </div>
         ) : (
           <>

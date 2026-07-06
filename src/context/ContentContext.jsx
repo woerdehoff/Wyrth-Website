@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { defaultContent } from '../content'
+import { defaultContent, normalizeContent } from '../content'
 
 const ContentContext = createContext({ content: defaultContent, setContent: () => {} })
 
@@ -21,7 +21,7 @@ export function ContentProvider({ children }) {
 
     fetch(url)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setContent(data) })
+      .then(data => { if (data) setContent(normalizeContent(data)) })
       .catch(() => {}) // silently fall back to defaults
   }, [])
 

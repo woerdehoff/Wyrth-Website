@@ -1,5 +1,9 @@
 node_modules/
 dist/
+Images/
+Video/
+public/images/
+public/videos/
 .env
 *.tfvars
 !terraform/example.tfvars

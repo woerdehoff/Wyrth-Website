@@ -1,4 +1,16 @@
+import { Link } from 'react-router-dom'
 import { useContent } from '../context/ContentContext'
+
+const AUDIENCE_ROUTES = {
+  Barbers:   '/barbers',
+  Stylists:  '/stylists',
+  Colorists: '/stylists',
+  Clients:   '/stylists',
+}
+
+function audienceId(title) {
+  return `audience-${title.toLowerCase().replace(/\s+/g, '-')}`
+}
 
 export default function AudienceGrid() {
   const { audiences } = useContent()
@@ -13,20 +25,28 @@ export default function AudienceGrid() {
       </div>
 
       <div className="audience__grid">
-        {audiences.map(a => (
-          <a
-            key={a.title}
-            href={a.href}
-            className="audience__card"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="audience__tag">{a.tag}</span>
-            <h3 className="audience__card-title">{a.title}</h3>
-            <p className="audience__card-desc">{a.desc}</p>
-            <span className="audience__link">Learn more →</span>
-          </a>
-        ))}
+        {audiences.map(a => {
+          const href = AUDIENCE_ROUTES[a.title] ?? a.href
+          const isInternal = href?.startsWith('/')
+          const Card = isInternal ? Link : 'a'
+          const cardProps = isInternal
+            ? { to: href }
+            : { href, target: '_blank', rel: 'noopener noreferrer' }
+
+          return (
+            <Card
+              key={a.title}
+              id={audienceId(a.title)}
+              className="audience__card"
+              {...cardProps}
+            >
+              <span className="audience__tag">{a.tag}</span>
+              <h3 className="audience__card-title">{a.title}</h3>
+              <p className="audience__card-desc">{a.desc}</p>
+              <span className="audience__link">Learn more →</span>
+            </Card>
+          )
+        })}
       </div>
     </section>
   )

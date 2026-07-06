@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useMsal, useIsAuthenticated, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
 import { loginRequest } from '../auth/msalConfig'
-import { defaultContent } from '../content'
+import {
+  defaultContent,
+  normalizeContent,
+  capeStatDefaults,
+  capeBadgeDefaults,
+  CAPE_STAT_POSITIONS,
+} from '../content'
 
 const CONTENT_API_URL = import.meta.env.VITE_CONTENT_API_URL
 
@@ -354,12 +360,26 @@ function CapeTab({ draft, setDraft }) {
     setDraft(d => ({ ...d, cape: { ...d.cape, [field]: value } }))
   }
   function setStat(i, field, value) {
-    const stats = draft.cape.stats.map((s, si) => si === i ? { ...s, [field]: value } : s)
+    const stats = capeStatDefaults.map((fallback, si) => {
+      const current = draft.cape.stats[si] ?? fallback
+      return si === i ? { ...current, [field]: value } : { ...current }
+    })
     setDraft(d => ({ ...d, cape: { ...d.cape, stats } }))
   }
   function setBadge(i, value) {
-    const badges = draft.cape.badges.map((b, bi) => bi === i ? value : b)
+    const badges = capeBadgeDefaults.map((fallback, bi) => draft.cape.badges[bi] ?? fallback)
+    badges[i] = value
     setDraft(d => ({ ...d, cape: { ...d.cape, badges } }))
+  }
+  function resetStatBoxes() {
+    setDraft(d => ({
+      ...d,
+      cape: {
+        ...d.cape,
+        stats: capeStatDefaults.map(s => ({ ...s })),
+        badges: [...capeBadgeDefaults],
+      },
+    }))
   }
   return (
     <section className="atab">
@@ -375,18 +395,40 @@ function CapeTab({ draft, setDraft }) {
         <Field label="Paragraph 2" value={draft.cape.body2} onChange={v => set('body2', v)} rows={4} />
       </div>
       <div className="atab__group">
-        <h3 className="atab__group-title">Stats</h3>
-        {draft.cape.stats.map((s, i) => (
-          <div key={i} className="atab__row">
-            <Field label="Value" value={s.value} onChange={v => setStat(i, 'value', v)} />
-            <Field label="Label" value={s.label} onChange={v => setStat(i, 'label', v)} />
-          </div>
-        ))}
+        <div className="atab__group-head">
+          <h3 className="atab__group-title">Stat Boxes (2×2 grid)</h3>
+          <button type="button" className="atab__reset-btn" onClick={resetStatBoxes}>
+            Reset boxes to defaults
+          </button>
+        </div>
+        <p className="afield__hint">All four boxes need both a value and a label. Empty fields can break the grid on the live site.</p>
+        {capeStatDefaults.map((fallback, i) => {
+          const s = draft.cape.stats[i] ?? fallback
+          return (
+            <div key={i} className="atab__row">
+              <Field
+                label={`${CAPE_STAT_POSITIONS[i]} — Value`}
+                value={s.value}
+                onChange={v => setStat(i, 'value', v)}
+              />
+              <Field
+                label={`${CAPE_STAT_POSITIONS[i]} — Label`}
+                value={s.label}
+                onChange={v => setStat(i, 'label', v)}
+              />
+            </div>
+          )
+        })}
       </div>
       <div className="atab__group">
         <h3 className="atab__group-title">Badges</h3>
-        {draft.cape.badges.map((b, i) => (
-          <Field key={i} label={`Badge ${i + 1}`} value={b} onChange={v => setBadge(i, v)} />
+        {capeBadgeDefaults.map((fallback, i) => (
+          <Field
+            key={i}
+            label={`Badge ${i + 1}`}
+            value={draft.cape.badges[i] ?? fallback}
+            onChange={v => setBadge(i, v)}
+          />
         ))}
       </div>
       <div className="atab__preview">
@@ -998,8 +1040,9 @@ function AdminPanel() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
-          setDraft(data)
-          setLiveContent(JSON.parse(JSON.stringify(data)))
+          const normalized = normalizeContent(data)
+          setDraft(normalized)
+          setLiveContent(JSON.parse(JSON.stringify(normalized)))
         }
         setStatus(null)
       })
@@ -1143,7 +1186,7 @@ function AdminPanel() {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${tokenRes.idToken}`,
         },
-        body: JSON.stringify({ content: draft }),
+        body: JSON.stringify({ content: normalizeContent(draft) }),
       })
 
       if (!res.ok) {
@@ -1151,8 +1194,10 @@ function AdminPanel() {
         throw new Error(err.error || `HTTP ${res.status}`)
       }
 
+      const published = normalizeContent(draft)
+      setDraft(published)
       setStatus('saved')
-      setLiveContent(JSON.parse(JSON.stringify(draft)))
+      setLiveContent(JSON.parse(JSON.stringify(published)))
       addToast('Changes published!', 'success')
       setTimeout(() => setStatus(null), 4000)
     } catch (err) {

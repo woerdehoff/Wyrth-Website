@@ -21,6 +21,9 @@ import RefundPolicy from './pages/RefundPolicy'
 import ShippingPolicy from './pages/ShippingPolicy'
 import TermsOfService from './pages/TermsOfService'
 import VerifyMagicLink from './pages/VerifyMagicLink'
+import Barbers from './pages/Barbers'
+import Stylists from './pages/Stylists'
+import ContactReturns from './pages/ContactReturns'
 
 function PublicSite() {
   return (
@@ -44,14 +47,20 @@ function ScrollToHash() {
 
   useEffect(() => {
     const hash = location.hash.slice(1)
-    if (!hash) return
-    
-    setTimeout(() => {
-      const el = document.getElementById(hash)
-      if (el) el.scrollIntoView({ behavior: 'smooth' })
-    }, 0)
-  }, [location.hash])
-  
+
+    if (hash) {
+      const scrollToHash = () => {
+        const el = document.getElementById(hash)
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+        else window.scrollTo(0, 0)
+      }
+      setTimeout(scrollToHash, 0)
+      return
+    }
+
+    window.scrollTo(0, 0)
+  }, [location.pathname, location.hash])
+
   return null
 }
 
@@ -87,10 +96,13 @@ export default function App() {
             <Route path="/shop/success"     element={<ShopSuccess />} />
             <Route path="/shop/cancel"      element={<ShopCancel />} />
             <Route path="/shop"             element={<Shop />} />
+            <Route path="/barbers"          element={<Barbers />} />
+            <Route path="/stylists"        element={<Stylists />} />
             <Route path="/privacy-policy"   element={<PrivacyPolicy />} />
             <Route path="/refund-policy"    element={<RefundPolicy />} />
             <Route path="/shipping-policy"  element={<ShippingPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/contact-returns"  element={<ContactReturns />} />
             <Route path="*"                 element={<PublicSite />} />
           </Routes>
           <CartDrawer />
