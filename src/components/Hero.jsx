@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
 import { useContent } from '../context/ContentContext'
-import { useAuth } from '../context/AuthContext'
+import SignInPrompt from './SignInPrompt'
 
 export default function Hero() {
   const { hero } = useContent()
-  const { user, login, googleClientId } = useAuth()
 
   return (
     <section className="hero">
@@ -28,19 +26,7 @@ export default function Hero() {
           </a>
         </div>
 
-        {!user && googleClientId && (
-          <div className="hero__signin">
-            <span className="hero__signin-label">Sign in for faster checkout</span>
-            <GoogleLogin
-              onSuccess={resp => login(resp.credential)}
-              onError={() => {}}
-              theme="filled_black"
-              shape="pill"
-              text="signin"
-              size="medium"
-            />
-          </div>
-        )}
+        <SignInPrompt className="hero__signin" />
       </div>
 
       <div className="hero__scroll">

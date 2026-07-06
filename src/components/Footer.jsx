@@ -1,22 +1,24 @@
-import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
+import SignInPrompt from './SignInPrompt'
 
 const SHOP = [
   { label: 'The Cape',     href: '/shop' },
-  { label: 'For Barbers',  href: '/shop' },
+  { label: 'For Barbers',  href: '/barbers' },
   { label: 'Bundles',      href: '/shop' },
   { label: 'Custom Capes', href: '/shop' },
 ]
 
 const POLICIES = [
-  { label: 'Privacy Policy',   href: '/privacy-policy' },
-  { label: 'Refund Policy',    href: '/refund-policy' },
-  { label: 'Shipping Policy',  href: '/shipping-policy' },
-  { label: 'Terms of Service', href: '/terms-of-service' },
+  { label: 'Privacy Policy',    href: '/privacy-policy' },
+  { label: 'Refund Policy',     href: '/refund-policy' },
+  { label: 'Shipping Policy',   href: '/shipping-policy' },
+  { label: 'Terms of Service',  href: '/terms-of-service' },
+  { label: 'Contact & Returns', href: '/contact-returns' },
 ]
 
 export default function Footer() {
-  const { user, login, logout, googleClientId } = useAuth()
+  const { user, logout, googleClientId, magicLinkEnabled } = useAuth()
+  const canSignIn = !user && (googleClientId || magicLinkEnabled)
 
   return (
     <footer className="footer">
@@ -63,17 +65,9 @@ export default function Footer() {
               <p className="footer__account-name">{user.name || user.email}</p>
               <button className="footer__signout" onClick={logout}>Sign Out</button>
             </div>
-          ) : googleClientId ? (
+          ) : canSignIn ? (
             <div className="footer__account">
-              <p className="footer__account-hint">Sign in to save your cart and check out faster.</p>
-              <GoogleLogin
-                onSuccess={resp => login(resp.credential)}
-                onError={() => {}}
-                theme="filled_black"
-                shape="rectangular"
-                text="signin_with"
-                size="medium"
-              />
+              <SignInPrompt label="Sign in to save your cart and check out faster." />
             </div>
           ) : (
             <p className="footer__account-hint">Account sign-in coming soon.</p>
@@ -88,6 +82,7 @@ export default function Footer() {
           wyrthco.com
         </a>
       </div>
+
     </footer>
   )
 }

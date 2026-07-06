@@ -1,43 +1,30 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
-import MagicLinkModal from './MagicLinkModal'
+import SignInModal from './SignInModal'
 
 const NAV_LINKS = [
   { label: 'The Cape', href: '/#cape' },
-  { label: 'Barbers',  href: '/#audience' },
-  { label: 'Stylists', href: '/#audience' },
+  { label: 'Barbers',  href: '/barbers' },
+  { label: 'Stylists & Colorists', href: '/stylists' },
   { label: 'Features', href: '/#features' },
+  { label: 'Contact & Returns', href: '/contact-returns' },
 ]
 
 export default function Nav() {
   const [scrolled,   setScrolled]   = useState(false)
   const [open,       setOpen]       = useState(false)
   const [signinOpen, setSigninOpen] = useState(false)
-  const [magicOpen,  setMagicOpen]  = useState(false)
-  const { user, login, logout, googleClientId } = useAuth()
+  const { user, logout, googleClientId, magicLinkEnabled } = useAuth()
   const { count, setOpen: openCart } = useCart()
-  const signinRef = useRef(null)
+  const canSignIn = !user && (googleClientId || magicLinkEnabled)
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 60)
     window.addEventListener('scroll', handler, { passive: true })
     return () => window.removeEventListener('scroll', handler)
   }, [])
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!signinOpen) return
-    function handleOutside(e) {
-      if (signinRef.current && !signinRef.current.contains(e.target)) {
-        setSigninOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [signinOpen])
 
   return (
     <>
@@ -51,34 +38,16 @@ export default function Nav() {
               <Link to={l.href} onClick={() => setOpen(false)}>{l.label}</Link>
             </li>
           ))}
-          <li>
-            <Link to="/shop" onClick={() => setOpen(false)}>Shop</Link>
-          </li>
 
-          {/* Mobile menu: sign-in options */}
-          {!user && (
-            <>
-              {googleClientId && (
-                <li className="nav__links-signin">
-                  <GoogleLogin
-                    onSuccess={resp => { login(resp.credential); setOpen(false) }}
-                    onError={() => {}}
-                    theme="filled_black"
-                    shape="pill"
-                    text="signin_with"
-                    size="large"
-                  />
-                </li>
-              )}
-              <li className="nav__links-signin">
-                <button
-                  className="nav__email-signin-btn"
-                  onClick={() => { setMagicOpen(true); setOpen(false) }}
-                >
-                  Sign in with Email
-                </button>
-              </li>
-            </>
+          {canSignIn && (
+            <li className="nav__links-signin">
+              <button
+                className="nav__email-signin-btn"
+                onClick={() => { setSigninOpen(true); setOpen(false) }}
+              >
+                Sign in
+              </button>
+            </li>
           )}
           {user && (
             <li className="nav__links-user">
@@ -91,7 +60,6 @@ export default function Nav() {
         </ul>
 
         <div className="nav__actions">
-          {/* Cart icon */}
           <button
             className="nav__cart-btn"
             onClick={() => openCart(true)}
@@ -105,7 +73,6 @@ export default function Nav() {
             {count > 0 && <span className="nav__cart-count">{count}</span>}
           </button>
 
-          {/* Signed in: avatar click → sign out */}
           {user ? (
             <button className="nav__user-btn" onClick={logout} title={`Sign out (${user.email})`}>
               {user.picture
@@ -113,52 +80,18 @@ export default function Nav() {
                 : <span className="nav__avatar nav__avatar--initials">{user.name?.[0] ?? '?'}</span>
               }
             </button>
-          ) : (
-            /* Sign In dropdown */
-            <div className="nav__signin-dropdown" ref={signinRef}>
-              <button
-                className="nav__signin-trigger"
-                onClick={() => setSigninOpen(o => !o)}
-                aria-expanded={signinOpen}
-                aria-haspopup="true"
-              >
-                Sign In
-                <svg className="nav__signin-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                  <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-
-              {signinOpen && (
-                <div className="nav__signin-menu" role="menu">
-                  {googleClientId && (
-                    <div className="nav__signin-item">
-                      <GoogleLogin
-                        onSuccess={resp => { login(resp.credential); setSigninOpen(false) }}
-                        onError={() => {}}
-                        theme="filled_black"
-                        shape="pill"
-                        text="signin_with"
-                        size="medium"
-                        width="100%"
-                      />
-                    </div>
-                  )}
-                  <div className="nav__signin-item">
-                    <button
-                      className="nav__signin-email-btn"
-                      onClick={() => { setMagicOpen(true); setSigninOpen(false) }}
-                    >
-                      <svg viewBox="0 0 20 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="1" y="1" width="18" height="14" rx="2"/>
-                        <path d="M1 4l9 6 9-6"/>
-                      </svg>
-                      Sign in with Email
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          ) : canSignIn ? (
+            <button
+              className="nav__signin-trigger nav__signin-trigger--icon"
+              onClick={() => setSigninOpen(true)}
+              aria-label="Sign in"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </button>
+          ) : null}
 
           <Link to="/shop" className="nav__cta">Buy Now</Link>
         </div>
@@ -176,7 +109,7 @@ export default function Nav() {
       </div>
     </nav>
 
-    {magicOpen && <MagicLinkModal onClose={() => setMagicOpen(false)} />}
+    {signinOpen && <SignInModal onClose={() => setSigninOpen(false)} />}
     </>
   )
 }
