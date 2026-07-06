@@ -7,8 +7,8 @@ export default function ShippingPolicy() {
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="policy-page">
-        <h1 className="policy-page__title">Shipping Policy</h1>
+      <main className="prose-policy max-w-[760px] mx-auto px-6 pt-24 pb-32 text-bone">
+        <h1>Shipping Policy</h1>
 
         <h2>Free US Shipping</h2>
         <p>We offer free standard shipping on all orders within the United States.</p>

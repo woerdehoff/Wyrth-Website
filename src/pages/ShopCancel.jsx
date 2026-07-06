@@ -8,14 +8,14 @@ export default function ShopCancel() {
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="shop-confirm">
-        <div className="shop-confirm__card">
-          <div className="shop-confirm__icon shop-confirm__icon--cancel">✕</div>
-          <h1 className="shop-confirm__title">Order Cancelled</h1>
-          <p className="shop-confirm__sub">
+      <main className="min-h-[80vh] flex items-center justify-center px-6 py-16">
+        <div className="text-center max-w-[440px] w-full px-10 py-14 border border-line bg-ink-2">
+          <div className="text-[2.5rem] text-bone-2 mb-6 leading-none">✕</div>
+          <h1 className="font-display text-[2.25rem] text-bone mb-4">Order Cancelled</h1>
+          <p className="text-[0.95rem] text-bone-2 leading-[1.65] mb-4">
             Your payment was not processed. No charge was made.
           </p>
-          <Link to="/shop" className="btn btn--gold shop-confirm__cta">
+          <Link to="/shop" className="btn btn--gold mt-6">
             Return to Shop
           </Link>
         </div>

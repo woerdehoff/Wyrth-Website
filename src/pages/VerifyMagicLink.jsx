@@ -6,7 +6,7 @@ export default function VerifyMagicLink() {
   const [searchParams]   = useSearchParams()
   const { verifyMagicLink } = useAuth()
   const navigate         = useNavigate()
-  const [status, setStatus] = useState('verifying') // verifying | success | error
+  const [status, setStatus] = useState('verifying')
   const [errMsg, setErrMsg] = useState('')
 
   useEffect(() => {
@@ -29,22 +29,32 @@ export default function VerifyMagicLink() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="verify-magic">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 p-8">
       {status === 'verifying' && (
         <>
-          <div className="verify-magic__spinner" aria-hidden="true" />
-          <p className="verify-magic__msg">Signing you in…</p>
+          <div
+            className="w-9 h-9 border-[3px] border-line rounded-full"
+            style={{
+              borderTopColor: 'var(--color-magenta)',
+              animation: 'spin 0.75s linear infinite',
+            }}
+            aria-hidden="true"
+          />
+          <p className="text-base text-bone-2 text-center m-0">Signing you in…</p>
         </>
       )}
       {status === 'success' && (
-        <p className="verify-magic__msg verify-magic__msg--ok">
+        <p className="text-base text-magenta text-center m-0">
           You're signed in. Redirecting…
         </p>
       )}
       {status === 'error' && (
         <>
-          <p className="verify-magic__msg verify-magic__msg--err">{errMsg}</p>
-          <button className="verify-magic__back" onClick={() => navigate('/', { replace: true })}>
+          <p className="text-base text-[#e05c5c] text-center m-0">{errMsg}</p>
+          <button
+            className="px-6 py-2.5 bg-ink-3 border border-line rounded-sm text-bone font-body text-[0.875rem] cursor-pointer transition-colors hover:bg-ink-4"
+            onClick={() => navigate('/', { replace: true })}
+          >
             Back to Home
           </button>
         </>

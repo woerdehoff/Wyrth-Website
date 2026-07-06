@@ -7,15 +7,21 @@ function SectionContent({ section }) {
   const paragraphs = section.paragraphs ?? (section.body ? [section.body] : [])
 
   return (
-    <section id={section.id} className="audience-page__section">
-      <h2 className="audience-page__section-title">{section.title}</h2>
+    <section id={section.id} className="mt-9">
+      <h2 className="font-body text-[1.05rem] font-bold text-bone-2 mb-3.5">
+        {section.title}
+      </h2>
       {paragraphs.map((text, i) => (
-        <p key={i} className="audience-page__text">{text}</p>
+        <p key={i} className="text-[0.95rem] leading-[1.75] text-bone-2 mb-5">
+          {text}
+        </p>
       ))}
       {section.bullets?.length > 0 && (
-        <ul className="audience-page__list">
+        <ul className="list-disc pl-6 mb-5 space-y-2">
           {section.bullets.map(item => (
-            <li key={item}>{item}</li>
+            <li key={item} className="text-[0.95rem] leading-[1.75] text-bone-2">
+              {item}
+            </li>
           ))}
         </ul>
       )}
@@ -40,23 +46,42 @@ export default function AudiencePage({
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="audience-page">
-        <article className="audience-page__content">
-          {tag && <p className="audience-page__tag">{tag}</p>}
+      <main className="min-h-[80vh] px-6 pt-28 pb-24">
+        <article className="max-w-[720px] mx-auto">
+          {tag && (
+            <p className="inline-block px-4 py-2 mb-8 border border-[#5b9fd4] rounded-md bg-[rgba(91,159,212,0.12)] font-body text-[0.95rem] font-medium text-bone">
+              {tag}
+            </p>
+          )}
 
-          {title && <h1 className="audience-page__title">{title}</h1>}
+          {title && (
+            <h1
+              className="font-body font-semibold leading-[1.35] text-bone-2 mb-7"
+              style={{ fontSize: 'clamp(1.75rem, 4vw, 2.35rem)' }}
+            >
+              {title}
+            </h1>
+          )}
 
-          {intro && <p className="audience-page__intro">{intro}</p>}
-          {sub && !intro && <p className="audience-page__intro">{sub}</p>}
+          {intro && (
+            <p className="text-[0.95rem] leading-[1.75] text-bone-2 mb-5">
+              {intro}
+            </p>
+          )}
+          {sub && !intro && (
+            <p className="text-[0.95rem] leading-[1.75] text-bone-2 mb-5">
+              {sub}
+            </p>
+          )}
 
           {sections.map(section => (
             <SectionContent key={section.id ?? section.title} section={section} />
           ))}
 
           {video && (
-            <figure className="audience-page__figure">
+            <figure className="mb-9">
               <video
-                className="audience-page__video"
+                className="block w-full border border-line bg-ink-2"
                 src={video}
                 controls
                 playsInline
@@ -67,13 +92,24 @@ export default function AudiencePage({
           )}
 
           {!video && image && (
-            <figure className="audience-page__figure">
-              <img src={image} alt={imageAlt || ''} className="audience-page__image" />
+            <figure className="mb-9">
+              <img
+                src={image}
+                alt={imageAlt || ''}
+                loading="lazy"
+                decoding="async"
+                className="block w-full border border-line bg-ink-2"
+              />
             </figure>
           )}
 
-          <div className="audience-page__cta">
-            <Link to={ctaHref} className="btn btn--gold">{ctaLabel}</Link>
+          <div className="mt-12">
+            <Link
+              to={ctaHref}
+              className="btn btn--gold audience-page-cta"
+            >
+              {ctaLabel}
+            </Link>
           </div>
         </article>
       </main>

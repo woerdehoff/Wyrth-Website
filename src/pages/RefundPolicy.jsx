@@ -7,8 +7,8 @@ export default function RefundPolicy() {
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="policy-page">
-        <h1 className="policy-page__title">Refund Policy</h1>
+      <main className="prose-policy max-w-[760px] mx-auto px-6 pt-24 pb-32 text-bone">
+        <h1>Refund Policy</h1>
 
         <h2>30 Day Refund Policy</h2>
         <p>We accept returns within 30 days of the shipment delivery for manufacturer defects only.</p>

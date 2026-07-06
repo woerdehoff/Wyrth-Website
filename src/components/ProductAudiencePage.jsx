@@ -11,35 +11,47 @@ function FaqAccordion({ items = [] }) {
   if (!items.length) return null
 
   return (
-    <section className="product-audience-page__faq" aria-label="Frequently asked questions">
+    <section
+      className="max-w-[720px] mx-auto mt-16 pt-16 border-t border-line"
+      aria-label="Frequently asked questions"
+    >
       {items.map((item, i) => {
         const isOpen = openIndex === i
         const panelId = `faq-panel-${i}`
         const buttonId = `faq-button-${i}`
 
         return (
-          <div key={item.question} className={`product-audience-page__faq-item${isOpen ? ' product-audience-page__faq-item--open' : ''}`}>
+          <div key={item.question} className="border-b border-line">
             <button
               type="button"
               id={buttonId}
-              className="product-audience-page__faq-trigger"
+              className={`flex items-center justify-between gap-6 w-full py-5 text-left text-[0.95rem] leading-[1.5] transition-colors ${
+                isOpen ? 'text-bone' : 'text-bone-2 hover:text-bone'
+              }`}
               aria-expanded={isOpen}
               aria-controls={panelId}
               onClick={() => setOpenIndex(isOpen ? null : i)}
             >
               <span>{item.question}</span>
-              <svg className="product-audience-page__faq-chevron" viewBox="0 0 12 8" fill="none" aria-hidden="true">
-                <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                viewBox="0 0 12 8"
+                fill="none"
+                aria-hidden="true"
+                className={`shrink-0 w-3 h-2 transition-[transform,color] duration-[250ms] ease-brand ${
+                  isOpen ? 'rotate-180 text-bone-2' : 'text-mute'
+                }`}
+              >
+                <path
+                  d="M1 1.5L6 6.5L11 1.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
-            <div
-              id={panelId}
-              role="region"
-              aria-labelledby={buttonId}
-              className="product-audience-page__faq-panel"
-              hidden={!isOpen}
-            >
-              <p>{item.answer}</p>
+            <div id={panelId} role="region" aria-labelledby={buttonId} className="pb-5" hidden={!isOpen}>
+              <p className="text-[0.9rem] leading-[1.75] text-bone-2">{item.answer}</p>
             </div>
           </div>
         )
@@ -50,20 +62,39 @@ function FaqAccordion({ items = [] }) {
 
 function StorySplitSection({ title, body, aside, image, imagePosition = 'right', asideWithImage = false }) {
   if (!title && !body) return null
+  const imageLeft = imagePosition === 'left'
 
   return (
-    <section className={`product-audience-page__story${imagePosition === 'left' ? ' product-audience-page__story--image-left' : ''}`}>
-      <div className="product-audience-page__story-copy">
-        {title && <h2 className="product-audience-page__story-title">{title}</h2>}
-        {body && <p className="product-audience-page__story-body">{body}</p>}
-        {aside && !asideWithImage && <p className="product-audience-page__story-aside">{aside}</p>}
+    <section className="py-14 border-b border-line grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-x-16 items-start">
+      <div className={imageLeft ? 'md:order-2' : ''}>
+        {title && (
+          <h2 className="font-body text-[1.05rem] font-bold text-bone mb-5">{title}</h2>
+        )}
+        {body && (
+          <p className="text-[0.95rem] leading-[1.75] text-bone-2 mb-4">{body}</p>
+        )}
+        {aside && !asideWithImage && (
+          <p className={`text-[0.95rem] leading-[1.75] text-mute ${imageLeft ? 'text-left' : 'text-right'}`}>
+            {aside}
+          </p>
+        )}
       </div>
       {(image || (aside && asideWithImage)) && (
-        <div className="product-audience-page__story-media">
-          {aside && asideWithImage && <p className="product-audience-page__story-aside">{aside}</p>}
+        <div className={`flex flex-col gap-6 ${imageLeft ? 'md:order-1' : ''}`}>
+          {aside && asideWithImage && (
+            <p className={`text-[0.95rem] leading-[1.75] text-mute ${imageLeft ? 'text-left' : 'text-right'}`}>
+              {aside}
+            </p>
+          )}
           {image && (
-            <figure className="product-audience-page__story-figure">
-              <img src={image.src} alt={image.alt} />
+            <figure className="overflow-hidden border border-line bg-ink-2">
+              <img
+                src={image.src}
+                alt={image.alt}
+                loading="lazy"
+                decoding="async"
+                className="block w-full aspect-[4/3] object-cover object-center"
+              />
             </figure>
           )}
         </div>
@@ -87,28 +118,40 @@ function PromoVideo({ label, src, poster, tagline, alt }) {
   }
 
   return (
-    <section className="product-audience-page__video-block" aria-label={alt || 'Product video'}>
-      {label && <span className="product-audience-page__video-label">{label}</span>}
-      <div className="product-audience-page__video-wrap">
+    <section
+      className="pt-14 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 md:gap-x-12 items-start"
+      aria-label={alt || 'Product video'}
+    >
+      {label && (
+        <span className="text-[0.95rem] font-semibold text-bone pt-1">{label}</span>
+      )}
+      <div className="relative overflow-hidden border border-line bg-ink-2">
         <video
           ref={videoRef}
-          className="product-audience-page__video"
           src={src}
           poster={poster}
           playsInline
           preload="metadata"
           aria-label={alt || 'Product video'}
+          className="block w-full aspect-video object-cover bg-ink-3"
         />
         {!playing && (
           <button
             type="button"
-            className="product-audience-page__video-play"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-ink/55 transition-colors cursor-pointer hover:bg-ink/40 group"
             onClick={handlePlay}
             aria-label="Play video"
           >
-            {tagline && <p className="product-audience-page__video-tagline">{tagline}</p>}
-            <span className="product-audience-page__video-play-icon" aria-hidden="true">
-              <svg viewBox="0 0 64 64" fill="none">
+            {tagline && (
+              <p
+                className="font-display font-normal tracking-[.12em] uppercase text-bone text-center leading-[1.4]"
+                style={{ fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)', maxWidth: '20ch' }}
+              >
+                {tagline}
+              </p>
+            )}
+            <span className="w-16 h-16 text-bone opacity-90 transition-[transform,opacity] duration-200 ease-brand group-hover:scale-[1.06] group-hover:opacity-100">
+              <svg viewBox="0 0 64 64" fill="none" className="w-full h-full">
                 <circle cx="32" cy="32" r="31" stroke="currentColor" strokeWidth="2" />
                 <path d="M26 20L44 32L26 44V20Z" fill="currentColor" />
               </svg>
@@ -161,30 +204,49 @@ export default function ProductAudiencePage({
   const displayPrice = product?.priceInCents ?? priceInCents
   const installmentAmount = displayPrice ? formatPrice(Math.round(displayPrice / 4)) : null
 
+  const solo = gallery.length === 0
+
   return (
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="product-audience-page">
-        <div className={`product-audience-page__layout${gallery.length === 0 ? ' product-audience-page__layout--solo' : ''}`}>
+      <main className="min-h-[80vh] pt-28 pb-24 px-6">
+        <div
+          className={`grid gap-8 md:gap-y-12 md:gap-x-16 items-start mx-auto ${
+            solo ? 'grid-cols-1 max-w-[720px]' : 'grid-cols-1 md:grid-cols-2 max-w-[1100px]'
+          }`}
+        >
           {gallery.length > 0 && (
-            <div className="product-audience-page__gallery">
-              <div className="product-audience-page__main-img">
-                <img src={gallery[activeImage].src} alt={gallery[activeImage].alt} />
+            <div className="flex flex-col gap-3">
+              <div className="aspect-[4/5] bg-ink-2 border border-line overflow-hidden">
+                <img
+                  src={gallery[activeImage].src}
+                  alt={gallery[activeImage].alt}
+                  className="w-full h-full object-cover"
+                />
               </div>
               {gallery.length > 1 && (
-                <div className="product-audience-page__thumbs">
+                <div className="grid grid-cols-3 gap-3">
                   {gallery.slice(1).map((img, i) => {
                     const index = i + 1
+                    const active = index === activeImage
                     return (
                       <button
                         key={img.src}
                         type="button"
-                        className={`product-audience-page__thumb${index === activeImage ? ' product-audience-page__thumb--active' : ''}`}
+                        className={`aspect-square border bg-ink-2 overflow-hidden cursor-pointer transition-colors duration-200 ease-brand p-0 hover:border-magenta ${
+                          active ? 'border-magenta' : 'border-line'
+                        }`}
                         onClick={() => setActiveImage(index)}
                         aria-label={`View image ${index + 1}`}
                       >
-                        <img src={img.src} alt={img.alt} />
+                        <img
+                          src={img.src}
+                          alt={img.alt}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover"
+                        />
                       </button>
                     )
                   })}
@@ -193,42 +255,76 @@ export default function ProductAudiencePage({
             </div>
           )}
 
-          <div className="product-audience-page__info">
-            <p className="product-audience-page__brand">{brand}</p>
-            <h1 className="product-audience-page__title">{title}</h1>
+          <div>
+            <p className="text-[0.7rem] font-semibold tracking-[.2em] uppercase text-bone-2 mb-3">
+              {brand}
+            </p>
+            <h1
+              className="font-display font-normal leading-[1.25] text-bone-2 mb-5"
+              style={{ fontSize: 'clamp(1.6rem, 3vw, 2.1rem)' }}
+            >
+              {title}
+            </h1>
 
             {displayPrice != null && (
-              <p className="product-audience-page__price">{formatPrice(displayPrice)} USD</p>
+              <p className="text-[1.1rem] font-semibold text-bone mb-2">
+                {formatPrice(displayPrice)} USD
+              </p>
             )}
 
             {shippingNote && (
-              <p className="product-audience-page__note">{shippingNote}</p>
+              <p className="text-[0.85rem] text-bone-2 leading-[1.6] mb-2">{shippingNote}</p>
             )}
 
             {installmentNote && installmentAmount && (
-              <p className="product-audience-page__installment">
+              <p className="text-[0.85rem] text-bone-2 leading-[1.6] mb-2">
                 Pay in 4 interest-free installments of {installmentAmount} with{' '}
-                <span className="product-audience-page__shop-pay">shop Pay</span>
-                {' '}<a href="/shop">Learn more</a>
+                <span className="font-semibold text-[#5b9fd4]">shop Pay</span>{' '}
+                <a
+                  href="/shop"
+                  className="text-bone-2 underline underline-offset-2 transition-colors hover:text-bone"
+                >
+                  Learn more
+                </a>
               </p>
             )}
 
             {description && (
-              <p className="product-audience-page__desc">{description}</p>
+              <p className="text-[0.9rem] leading-[1.75] text-bone-2 pt-6 border-t border-line">
+                {description}
+              </p>
             )}
           </div>
         </div>
 
         {showcaseImages.length > 0 && (
-          <section className="product-audience-page__showcase" aria-label="The cape in the salon">
-            <figure className="product-audience-page__showcase-hero">
-              <img src={showcaseImages[0].src} alt={showcaseImages[0].alt} />
+          <section
+            className="max-w-[1100px] mx-auto mt-16 pt-16 border-t border-line"
+            aria-label="The cape in the salon"
+          >
+            <figure className="overflow-hidden border border-line bg-ink-2 mb-3 group">
+              <img
+                src={showcaseImages[0].src}
+                alt={showcaseImages[0].alt}
+                loading="lazy"
+                decoding="async"
+                className="block w-full aspect-video object-cover object-center transition-transform duration-[400ms] ease-brand group-hover:scale-[1.02]"
+              />
             </figure>
             {showcaseImages.length > 1 && (
-              <div className="product-audience-page__showcase-grid">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {showcaseImages.slice(1).map(img => (
-                  <figure key={img.src} className="product-audience-page__showcase-item">
-                    <img src={img.src} alt={img.alt} />
+                  <figure
+                    key={img.src}
+                    className="overflow-hidden border border-line bg-ink-2 group"
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      loading="lazy"
+                      decoding="async"
+                      className="block w-full aspect-video object-cover object-center transition-transform duration-[400ms] ease-brand group-hover:scale-[1.02]"
+                    />
                   </figure>
                 ))}
               </div>
@@ -239,20 +335,35 @@ export default function ProductAudiencePage({
         <FaqAccordion items={faq} />
 
         {problemsSection && (
-          <section className="product-audience-page__problems" aria-labelledby="problems-heading">
+          <section
+            className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-x-16 max-w-[1100px] mx-auto mt-16 pt-16 border-t border-line items-center"
+            aria-labelledby="problems-heading"
+          >
             {problemsSection.image && (
-              <figure className="product-audience-page__problems-figure">
-                <img src={problemsSection.image.src} alt={problemsSection.image.alt} />
+              <figure className="overflow-hidden border border-line bg-ink-2">
+                <img
+                  src={problemsSection.image.src}
+                  alt={problemsSection.image.alt}
+                  loading="lazy"
+                  decoding="async"
+                  className="block w-full aspect-[4/5] object-cover object-center"
+                />
               </figure>
             )}
-            <div className="product-audience-page__problems-content">
-              <h2 id="problems-heading" className="product-audience-page__problems-title">
+            <div>
+              <h2
+                id="problems-heading"
+                className="font-display font-normal leading-[1.2] text-bone-2 mb-7"
+                style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)' }}
+              >
                 {problemsSection.title}
               </h2>
               {problemsSection.bullets?.length > 0 && (
-                <ul className="product-audience-page__problems-list">
+                <ul className="list-disc pl-5 space-y-1.5">
                   {problemsSection.bullets.map(item => (
-                    <li key={item}>{item}</li>
+                    <li key={item} className="text-[0.95rem] leading-[1.75] text-bone-2">
+                      {item}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -260,7 +371,7 @@ export default function ProductAudiencePage({
           </section>
         )}
 
-        <div className="product-audience-page__story-group">
+        <div className="max-w-[1100px] mx-auto mt-16 pt-16 border-t border-line">
           <StorySplitSection {...whyWeCareSection} asideWithImage />
           <StorySplitSection {...solutionSection} />
           <StorySplitSection {...drapeSection} imagePosition="left" />

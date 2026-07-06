@@ -7,9 +7,9 @@ export default function PrivacyPolicy() {
     <>
       <AnnouncementBanner />
       <Nav />
-      <main className="policy-page">
-        <h1 className="policy-page__title">Privacy Policy</h1>
-        <p className="policy-page__updated">Last updated: October 10, 2025</p>
+      <main className="prose-policy max-w-[760px] mx-auto px-6 pt-24 pb-32 text-bone">
+        <h1>Privacy Policy</h1>
+        <p className="prose-policy__updated">Last updated: October 10, 2025</p>
 
         <p>This Privacy Policy describes how WYRTH (the "Site", "we", "us", or "our") collects, uses, and discloses your personal information when you visit, use our services, or make a purchase from wyrthco.com (the "Site") or otherwise communicate with us regarding the Site (collectively, the "Services"). For purposes of this Privacy Policy, "you" and "your" means you as the user of the Services, whether you are a customer, website visitor, or another individual whose information we have collected pursuant to this Privacy Policy.</p>
         <p>Please read this Privacy Policy carefully. By using and accessing any of the Services, you agree to the collection, use, and disclosure of your information as described in this Privacy Policy. If you do not agree to this Privacy Policy, please do not use or access any of the Services.</p>
