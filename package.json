@@ -10,7 +10,9 @@
     "deploy": "./deploy.sh",
     "deploy:dev": "./deploy.sh --env dev",
     "deploy:test": "./deploy.sh --env test",
-    "deploy:prod": "./deploy.sh --env prod"
+    "deploy:prod": "./deploy.sh --env prod",
+    "deploy:azure:dev": "./deploy-azure.sh --env dev",
+    "deploy:azure:prod": "./deploy-azure.sh --env prod"
   },
   "dependencies": {
     "@azure/msal-browser": "^3.28.0",

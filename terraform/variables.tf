@@ -79,9 +79,15 @@ variable "environment" {
 }
 
 variable "ses_from_email" {
-  description = "SES verified From address for sending magic link emails (e.g. noreply@wyrth.co)"
+  description = "SES verified From address for sending magic link emails (e.g. noreply@wyrthco.com)"
   type        = string
   default     = ""
+}
+
+variable "manage_ses_identity" {
+  description = "Create and manage the SES domain identity in this apply. Set true only for prod — SES is account-level."
+  type        = bool
+  default     = false
 }
 
 variable "jwt_secret" {

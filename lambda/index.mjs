@@ -4,6 +4,10 @@ import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-clo
 import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand, UpdateItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { createPublicKey, createVerify, createHmac, createHash, timingSafeEqual, randomUUID } from 'node:crypto'
+import * as security from './security.mjs'
+
+let _event = null
+function cors() { return security.corsHeaders(_event) }
 
 const s3  = new S3Client({})
 const cf  = new CloudFrontClient({ region: 'us-east-1' })
@@ -116,13 +120,6 @@ async function verifyGoogleToken(authHeader) {
   })
 }
 
-// ── CORS headers ─────────────────────────────────────────────────────
-const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-}
-
 // ── DynamoDB helpers ─────────────────────────────────────────────────
 function marshal(obj) {
   const result = {}
@@ -178,10 +175,10 @@ async function handleGetContent() {
   try {
     const result = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'content.json' }))
     const body   = await result.Body.transformToString()
-    return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body }
+    return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body }
   } catch (err) {
     if (err.name === 'NoSuchKey') {
-      return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No content saved yet' }) }
+      return { statusCode: 404, headers: cors(), body: JSON.stringify({ error: 'No content saved yet' }) }
     }
     throw err
   }
@@ -190,16 +187,16 @@ async function handleGetContent() {
 // ── Route: POST /content ──────────────────────────────────────────────
 async function handlePostContent(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const { content } = body
   if (!content || typeof content !== 'object') {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Missing content' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Missing content' }) }
   }
 
   await s3.send(new PutObjectCommand({
@@ -210,7 +207,7 @@ async function handlePostContent(event) {
     DistributionId: DISTRIBUTION_ID,
     InvalidationBatch: { CallerReference: Date.now().toString(), Paths: { Quantity: 1, Items: ['/content.json'] } },
   }))
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 }
 
 // ── Route: GET /shop/products ─────────────────────────────────────────
@@ -221,30 +218,30 @@ async function handleGetProducts() {
     ExpressionAttributeValues: { ':t': { BOOL: true } },
   }))
   const products = (result.Items || []).map(unmarshal)
-  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ products }) }
+  return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ products }) }
 }
 
 // ── Route: GET /shop/products/all (admin) ─────────────────────────────
 async function handleGetAllProducts(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
   const result = await ddb.send(new ScanCommand({ TableName: PRODUCTS_TABLE }))
-  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ products: (result.Items || []).map(unmarshal) }) }
+  return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ products: (result.Items || []).map(unmarshal) }) }
 }
 
 // ── Route: POST /shop/products (admin) ───────────────────────────────
 async function handleUpsertProduct(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const { productId, name, description, priceInCents, imageUrl, active } = body
   if (!productId || !name || !priceInCents) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId, name, and priceInCents are required' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'productId, name, and priceInCents are required' }) }
   }
 
   const safeId = String(productId).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 64)
@@ -258,29 +255,29 @@ async function handleUpsertProduct(event) {
       active: active !== false, createdAt: new Date().toISOString(),
     }),
   }))
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, productId: safeId }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true, productId: safeId }) }
 }
 
 // ── Route: POST /shop/products/delete (admin) ─────────────────────────
 async function handleDeleteProduct(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
-  if (!body.productId) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'productId is required' }) }
+  if (!body.productId) return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'productId is required' }) }
   await ddb.send(new DeleteItemCommand({ TableName: PRODUCTS_TABLE, Key: { productId: { S: String(body.productId) } } }))
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 }
 
 // ── Route: POST /shop/checkout ────────────────────────────────────────
 async function handleCheckout(event) {
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   // Accept a cart items array  OR  a legacy single productId+quantity
@@ -298,16 +295,16 @@ async function handleCheckout(event) {
       quantity:  Math.max(1, Math.min(10, Math.round(Number(body.quantity || 1)))),
     }]
   } else {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'items array or productId is required' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'items array or productId is required' }) }
   }
 
   if (lineItemsInput.length === 0) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'No valid items' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'No valid items' }) }
   }
 
   // No Stripe key — fall back to Shopify
   if (!STRIPE_SECRET_KEY) {
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: `${SITE_URL}/shop` }) }
+    return { statusCode: 200, headers: cors(), body: JSON.stringify({ url: `${SITE_URL}/shop` }) }
   }
 
   // Look up authoritative prices from DynamoDB (prevents client-side price tampering)
@@ -329,9 +326,9 @@ async function handleCheckout(event) {
   for (let i = 0; i < lineItemsInput.length; i++) {
     const item    = lineItemsInput[i]
     const result  = productResults[i]
-    if (!result.Item) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: `Product not found: ${item.productId}` }) }
+    if (!result.Item) return { statusCode: 404, headers: cors(), body: JSON.stringify({ error: `Product not found: ${item.productId}` }) }
     const product = unmarshal(result.Item)
-    if (!product.active) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Product unavailable: ${product.name}` }) }
+    if (!product.active) return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: `Product unavailable: ${product.name}` }) }
 
     params[`line_items[${i}][quantity]`]                              = String(item.quantity)
     params[`line_items[${i}][price_data][currency]`]                  = 'usd'
@@ -344,7 +341,7 @@ async function handleCheckout(event) {
   params['metadata[productIds]'] = lineItemsInput.map(i => i.productId).join(',').slice(0, 500)
 
   const session = await stripePost('/v1/checkout/sessions', params)
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ url: session.url }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ url: session.url }) }
 }
 
 // ── Route: POST /shop/webhook ─────────────────────────────────────────
@@ -353,11 +350,11 @@ async function handleWebhook(event) {
   const sigHeader = event.headers?.['stripe-signature'] || event.headers?.['Stripe-Signature']
 
   try { verifyStripeSignature(rawBody, sigHeader) }
-  catch (err) { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: err.message }) } }
+  catch (err) { return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: err.message }) } }
 
   let stripeEvent
   try { stripeEvent = JSON.parse(rawBody) } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   if (stripeEvent.type === 'checkout.session.completed') {
@@ -375,46 +372,46 @@ async function handleWebhook(event) {
     }))
   }
 
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ received: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ received: true }) }
 }
 
 // ── Route: GET /shop/orders (admin) ──────────────────────────────────
 async function handleGetOrders(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   const result = await ddb.send(new ScanCommand({ TableName: ORDERS_TABLE }))
   const orders = (result.Items || []).map(unmarshal).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ orders }) }
+  return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ orders }) }
 }
 
 // ── Route: GET /shop/cart ─────────────────────────────────────────────
 async function handleGetCart(event) {
   let user
   try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   const result = await ddb.send(new GetItemCommand({ TableName: CARTS_TABLE, Key: { userId: { S: user.sub } } }))
-  if (!result.Item) return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [] }) }
+  if (!result.Item) return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [] }) }
 
   const cart  = unmarshal(result.Item)
   const items = JSON.parse(cart.items || '[]')
-  return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }
+  return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }
 }
 
 // ── Route: POST /shop/cart ────────────────────────────────────────────
 async function handleSaveCart(event) {
   let user
   try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const { items } = body
-  if (!Array.isArray(items)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'items must be an array' }) }
+  if (!Array.isArray(items)) return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'items must be an array' }) }
 
   // Sanitize: only keep known scalar fields, clamp quantity
   const clean = items.map(i => ({
@@ -433,7 +430,7 @@ async function handleSaveCart(event) {
     Item: marshal({ userId: user.sub, email: user.email || '', items: JSON.stringify(clean), updatedAt: new Date().toISOString(), expiresAt }),
   }))
 
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 }
 
 // ── Image upload (presigned URL) ──────────────────────────────────────
@@ -458,23 +455,23 @@ async function handleUploadUrl(event) {
 
   return {
     statusCode: 200,
-    headers: CORS,
+    headers: cors(),
     body: JSON.stringify({ uploadUrl, publicUrl }),
   }
 }
 
 // ── Route: POST /analytics/track ──────────────────────────────────────
 async function handleTrack(event) {
-  if (!ANALYTICS_TABLE) return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  if (!ANALYTICS_TABLE) return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const page = String(body.page || '/').slice(0, 200)
-  if (!page.startsWith('/')) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid page' }) }
-  if (page.startsWith('/admin')) return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  if (!page.startsWith('/')) return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid page' }) }
+  if (page.startsWith('/admin')) return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 
   const today = new Date().toISOString().slice(0, 10)
   const ttl = Math.floor(Date.now() / 1000) + 90 * 86400
@@ -518,16 +515,16 @@ async function handleTrack(event) {
     if (err.name !== 'ConditionalCheckFailedException') throw err
   }
 
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 }
 
 // ── Route: GET /analytics ─────────────────────────────────────────────
 async function handleGetAnalytics(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
-  catch (err) { return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
+  catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   if (!ANALYTICS_TABLE) {
-    return { statusCode: 200, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify({ daily: [], pages: [] }) }
+    return { statusCode: 200, headers: { ...cors(), 'Content-Type': 'application/json' }, body: JSON.stringify({ daily: [], pages: [] }) }
   }
 
   const days = Math.min(90, Math.max(1, Number(event.queryStringParameters?.days) || 30))
@@ -566,7 +563,7 @@ async function handleGetAnalytics(event) {
 
   return {
     statusCode: 200,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...cors(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ daily, pages }),
   }
 }
@@ -575,16 +572,23 @@ async function handleGetAnalytics(event) {
 async function handleMagicLinkSend(event) {
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const email = (body.email || '').trim().toLowerCase()
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Valid email required' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Valid email required' }) }
+  }
+
+  for (const blocked of [
+    await security.enforceRateLimit(event, 'magic-ip', security.getClientIp(event), 5, 3600),
+    await security.enforceRateLimit(event, 'magic-email', email, 3, 3600),
+  ]) {
+    if (blocked) return blocked
   }
 
   if (!SES_FROM_EMAIL || !MAGIC_TOKENS_TABLE || !JWT_SECRET) {
-    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Magic link not configured' }) }
+    return { statusCode: 503, headers: cors(), body: JSON.stringify({ error: 'Magic link not configured' }) }
   }
 
   const token = randomUUID()
@@ -597,38 +601,47 @@ async function handleMagicLinkSend(event) {
 
   const link = `${SITE_URL}/auth/verify?token=${token}`
 
-  await ses.send(new SendEmailCommand({
-    FromEmailAddress: SES_FROM_EMAIL,
-    Destination: { ToAddresses: [email] },
-    Content: {
-      Simple: {
-        Subject: { Data: 'Sign in to Wyrth', Charset: 'UTF-8' },
-        Body: {
-          Text: {
-            Data: `Click the link below to sign in to Wyrth. This link expires in 15 minutes.\n\n${link}\n\nIf you did not request this, you can safely ignore this email.`,
-            Charset: 'UTF-8',
-          },
-          Html: {
-            Data: `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#111"><h2 style="margin-bottom:8px">Sign in to Wyrth</h2><p>Click the button below to sign in. This link expires in <strong>15 minutes</strong>.</p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:6px;margin:16px 0;font-weight:600">Sign in to Wyrth</a><p style="color:#666;font-size:13px;margin-top:24px">If you did not request this email, you can safely ignore it.</p></body></html>`,
-            Charset: 'UTF-8',
+  try {
+    await ses.send(new SendEmailCommand({
+      FromEmailAddress: SES_FROM_EMAIL,
+      Destination: { ToAddresses: [email] },
+      Content: {
+        Simple: {
+          Subject: { Data: 'Sign in to Wyrth', Charset: 'UTF-8' },
+          Body: {
+            Text: {
+              Data: `Click the link below to sign in to Wyrth. This link expires in 15 minutes.\n\n${link}\n\nIf you did not request this, you can safely ignore this email.`,
+              Charset: 'UTF-8',
+            },
+            Html: {
+              Data: `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#111"><h2 style="margin-bottom:8px">Sign in to Wyrth</h2><p>Click the button below to sign in. This link expires in <strong>15 minutes</strong>.</p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:6px;margin:16px 0;font-weight:600">Sign in to Wyrth</a><p style="color:#666;font-size:13px;margin-top:24px">If you did not request this email, you can safely ignore it.</p></body></html>`,
+              Charset: 'UTF-8',
+            },
           },
         },
       },
-    },
-  }))
+    }))
+  } catch (err) {
+    console.error('SES send failed:', err)
+    const msg = String(err.message || '')
+    if (msg.includes('not verified') || err.name === 'MessageRejected') {
+      return { statusCode: 503, headers: cors(), body: JSON.stringify({ error: 'Email sign-in is not available yet. Please use Google sign-in.' }) }
+    }
+    throw err
+  }
 
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
 }
 
 // ── Route: GET /auth/magic/verify ─────────────────────────────────────
 async function handleMagicLinkVerify(event) {
   const token = event.queryStringParameters?.token || ''
   if (!token) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Token required' }) }
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Token required' }) }
   }
 
   if (!MAGIC_TOKENS_TABLE || !JWT_SECRET) {
-    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Magic link not configured' }) }
+    return { statusCode: 503, headers: cors(), body: JSON.stringify({ error: 'Magic link not configured' }) }
   }
 
   const result = await ddb.send(new GetItemCommand({
@@ -637,12 +650,12 @@ async function handleMagicLinkVerify(event) {
   }))
 
   if (!result.Item) {
-    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired link' }) }
+    return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: 'Invalid or expired link' }) }
   }
 
   const item = unmarshal(result.Item)
   if (item.ttl < Math.floor(Date.now() / 1000)) {
-    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Link expired' }) }
+    return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: 'Link expired' }) }
   }
 
   // Single-use: delete the token immediately
@@ -660,17 +673,51 @@ async function handleMagicLinkVerify(event) {
     exp:   now + 30 * 24 * 60 * 60, // 30 days
   })
 
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ jwt }) }
+  return { statusCode: 200, headers: cors(), body: JSON.stringify({ jwt }) }
 }
 
 // ── Main handler ──────────────────────────────────────────────────────
 export const handler = async (event) => {
+  _event = event
   const method = event.requestContext?.http?.method
   const path   = event.requestContext?.http?.path || '/'
 
-  if (method === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' }
+  if (method === 'OPTIONS') {
+    const origin = event.headers?.origin || event.headers?.Origin
+    if (!origin || security.isAllowedBrowserRequest(event)) {
+      return { statusCode: 204, headers: cors(), body: '' }
+    }
+    return { statusCode: 403, headers: {}, body: '' }
+  }
+
+  const ip = security.getClientIp(event)
 
   try {
+    if (path === '/auth/magic/send' && method === 'POST') {
+      const denied = security.requireBrowser(event)
+      if (denied) return denied
+    }
+    if (path === '/analytics/track' && method === 'POST') {
+      const denied = security.requireBrowser(event)
+      if (denied) return denied
+      const limited = await security.enforceRateLimit(event, 'track-ip', ip, 120, 60)
+      if (limited) return limited
+    }
+    if (path === '/shop/checkout' && method === 'POST') {
+      const denied = security.requireBrowser(event)
+      if (denied) return denied
+      const limited = await security.enforceRateLimit(event, 'checkout-ip', ip, 20, 3600)
+      if (limited) return limited
+    }
+    if (path === '/auth/magic/verify' && method === 'GET') {
+      const limited = await security.enforceRateLimit(event, 'verify-ip', ip, 30, 3600)
+      if (limited) return limited
+    }
+    if ((path === '/content' || path === '/shop/products') && method === 'GET') {
+      const limited = await security.enforceRateLimit(event, 'read-ip', ip, 300, 60)
+      if (limited) return limited
+    }
+
     if (path === '/content') {
       if (method === 'GET')  return await handleGetContent()
       if (method === 'POST') return await handlePostContent(event)
@@ -697,9 +744,9 @@ export const handler = async (event) => {
     if (path === '/auth/magic/send'   && method === 'POST') return await handleMagicLinkSend(event)
     if (path === '/auth/magic/verify' && method === 'GET')  return await handleMagicLinkVerify(event)
 
-    return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Not found' }) }
+    return { statusCode: 404, headers: cors(), body: JSON.stringify({ error: 'Not found' }) }
   } catch (err) {
     console.error(err)
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Internal server error' }) }
+    return { statusCode: 500, headers: cors(), body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

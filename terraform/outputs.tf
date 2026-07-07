@@ -51,3 +51,19 @@ output "ses_from_email" {
   description = "SES from address"
   value       = var.ses_from_email
 }
+
+output "ses_domain" {
+  description = "SES verified sending domain"
+  value       = local.ses_domain
+}
+
+output "ses_dkim_records" {
+  description = "CNAME records to add in DNS (GoDaddy) to verify the domain and enable DKIM"
+  value = var.manage_ses_identity && length(aws_sesv2_email_identity.domain) > 0 ? [
+    for token in aws_sesv2_email_identity.domain[0].dkim_signing_attributes[0].tokens : {
+      type  = "CNAME"
+      name  = "${token}._domainkey.${local.ses_domain}"
+      value = "${token}.dkim.amazonses.com"
+    }
+  ] : []
+}

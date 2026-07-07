@@ -19,6 +19,12 @@ resource "aws_iam_role" "content_api" {
 
 locals {
   site_url = var.site_url != "" ? var.site_url : "https://${aws_cloudfront_distribution.website.domain_name}"
+  api_cors_origins = compact([
+    local.site_url,
+    "https://${aws_cloudfront_distribution.website.domain_name}",
+    "http://localhost:5173",
+    "http://localhost:4173",
+  ])
 }
 
 resource "aws_iam_role_policy" "content_api" {
@@ -83,8 +89,9 @@ resource "aws_iam_role_policy" "content_api" {
 
 data "archive_file" "content_api" {
   type        = "zip"
-  source_file = "${path.module}/../lambda/index.mjs"
+  source_dir  = "${path.module}/../lambda"
   output_path = "${path.module}/../lambda/function.zip"
+  excludes    = ["function.zip"]
 }
 
 resource "aws_lambda_function" "content_api" {
@@ -125,7 +132,7 @@ resource "aws_apigatewayv2_api" "content_api" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["*"]
+    allow_origins = local.api_cors_origins
     allow_methods = ["GET", "POST", "OPTIONS"]
     allow_headers = ["Content-Type", "Authorization", "Stripe-Signature"]
     max_age       = 300
