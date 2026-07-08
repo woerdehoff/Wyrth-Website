@@ -27,7 +27,9 @@ provider "azurerm" {
 }
 
 locals {
-  site_url = var.site_url != "" ? var.site_url : "https://${azurerm_storage_account.website.primary_web_host}"
+  site_url = var.site_url != "" ? var.site_url : (
+    var.custom_domain != "" ? "https://${var.custom_domain}" : "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}"
+  )
   api_cors_origins = compact([
     local.site_url,
     "https://${azurerm_storage_account.website.primary_web_host}",

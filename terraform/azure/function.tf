@@ -66,6 +66,7 @@ resource "azurerm_linux_function_app" "api" {
     MAIL_FROM                       = var.mail_from
     MAIL_CLIENT_ID                  = var.mail_client_id
     MAIL_CLIENT_SECRET              = var.mail_client_secret
+    ADMIN_EMAILS                    = var.admin_emails
   }
 
   identity {

@@ -10,6 +10,10 @@ public/videos/
 !terraform/dev.tfvars
 !terraform/test.tfvars
 !terraform/prod.tfvars
+!terraform/azure/example.tfvars
+!terraform/azure/dev.tfvars
+!terraform/azure/test.tfvars
+!terraform/azure/prod.tfvars
 
 # Never commit local secret overrides or active tfvars
 terraform/secrets*.tfvars

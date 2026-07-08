@@ -120,6 +120,14 @@ async function verifyGoogleToken(authHeader) {
   })
 }
 
+async function verifyCustomerToken(authHeader) {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
+  const token = authHeader.slice(7)
+  const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'))
+  if (header.alg === 'HS256') return verifyHs256Jwt(token)
+  return verifyGoogleToken(authHeader)
+}
+
 // ── DynamoDB helpers ─────────────────────────────────────────────────
 function marshal(obj) {
   const result = {}
@@ -388,7 +396,7 @@ async function handleGetOrders(event) {
 // ── Route: GET /shop/cart ─────────────────────────────────────────────
 async function handleGetCart(event) {
   let user
-  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  try { user = await verifyCustomerToken(event.headers?.authorization ?? event.headers?.Authorization) }
   catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   const result = await ddb.send(new GetItemCommand({ TableName: CARTS_TABLE, Key: { userId: { S: user.sub } } }))
@@ -402,7 +410,7 @@ async function handleGetCart(event) {
 // ── Route: POST /shop/cart ────────────────────────────────────────────
 async function handleSaveCart(event) {
   let user
-  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  try { user = await verifyCustomerToken(event.headers?.authorization ?? event.headers?.Authorization) }
   catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
 
   let body

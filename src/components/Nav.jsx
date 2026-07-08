@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import SignInModal from './SignInModal'
+
+function userInitial(user) {
+  const label = user.name || user.email || ''
+  return label[0]?.toUpperCase() || '?'
+}
 
 const NAV_LINKS = [
   { label: 'The Cape', href: '/#cape' },
@@ -13,9 +18,11 @@ const NAV_LINKS = [
 ]
 
 export default function Nav() {
-  const [scrolled,   setScrolled]   = useState(false)
-  const [open,       setOpen]       = useState(false)
-  const [signinOpen, setSigninOpen] = useState(false)
+  const [scrolled,    setScrolled]    = useState(false)
+  const [open,        setOpen]        = useState(false)
+  const [signinOpen,  setSigninOpen]  = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef(null)
   const { user, logout, googleClientId, magicLinkEnabled } = useAuth()
   const { count, setOpen: openCart } = useCart()
   const canSignIn = !user && (googleClientId || magicLinkEnabled)
@@ -25,6 +32,22 @@ export default function Nav() {
     window.addEventListener('scroll', handler, { passive: true })
     return () => window.removeEventListener('scroll', handler)
   }, [])
+
+  useEffect(() => {
+    if (!accountOpen) return
+    function onPointerDown(e) {
+      if (accountRef.current && !accountRef.current.contains(e.target)) setAccountOpen(false)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setAccountOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [accountOpen])
 
   const navBase = 'fixed inset-x-0 top-0 z-[100] border-b transition-[background,padding,border-color] duration-[400ms] ease-brand'
   const navScrolled = scrolled
@@ -120,16 +143,38 @@ export default function Nav() {
           </button>
 
           {user ? (
-            <button
-              className="bg-transparent border-0 p-0 rounded-full overflow-hidden flex items-center cursor-pointer"
-              onClick={logout}
-              title={`Sign out (${user.email})`}
-            >
-              {user.picture
-                ? <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full object-cover border border-line" referrerPolicy="no-referrer" />
-                : <span className="w-7 h-7 rounded-full flex items-center justify-center bg-magenta text-ink text-xs font-bold border border-line">{user.name?.[0] ?? '?'}</span>
-              }
-            </button>
+            <div className="relative" ref={accountRef}>
+              <button
+                type="button"
+                className="bg-transparent border-0 p-0 rounded-full overflow-hidden flex items-center cursor-pointer"
+                onClick={() => setAccountOpen(o => !o)}
+                aria-expanded={accountOpen}
+                aria-haspopup="true"
+                aria-label="Account menu"
+              >
+                {user.picture
+                  ? <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full object-cover border border-line" referrerPolicy="no-referrer" />
+                  : <span className="w-7 h-7 rounded-full flex items-center justify-center bg-magenta text-ink text-xs font-bold border border-line">{userInitial(user)}</span>
+                }
+              </button>
+              {accountOpen && (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.5rem)] min-w-[220px] bg-ink-2 border border-line rounded-sm shadow-[0_12px_40px_rgba(0,0,0,.45)] z-[120] py-3 px-4"
+                  role="menu"
+                >
+                  <p className="text-[0.65rem] tracking-[.12em] uppercase text-bone-2 m-0 mb-1">Signed in as</p>
+                  <p className="text-[0.85rem] text-bone m-0 mb-3 break-all">{user.email}</p>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full bg-transparent border border-line-warm text-bone-2 px-3 py-2 rounded-sm text-[0.65rem] font-semibold tracking-[.14em] uppercase cursor-pointer transition-colors hover:text-magenta hover:border-magenta"
+                    onClick={() => { logout(); setAccountOpen(false) }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           ) : canSignIn ? (
             <button
               className="hidden md:flex bg-transparent border-0 p-1.5 min-w-11 min-h-11 items-center justify-center text-bone transition-colors hover:text-magenta cursor-pointer"

@@ -11,8 +11,18 @@ output "storage_account_name" {
 }
 
 output "cdn_hostname" {
-  description = "Public hostname for the static site (storage static website)"
+  description = "Storage static website origin hostname (not the public URL — use site_url)"
   value       = azurerm_storage_account.website.primary_web_host
+}
+
+output "front_door_hostname" {
+  description = "Azure Front Door endpoint URL"
+  value       = "https://${azurerm_cdn_frontdoor_endpoint.main.host_name}"
+}
+
+output "custom_domain_validation_token" {
+  description = "Add this as a DNS TXT record at _dnsauth.<custom_domain> to validate ownership for managed TLS"
+  value       = var.custom_domain != "" ? azurerm_cdn_frontdoor_custom_domain.main[0].validation_token : null
 }
 
 output "site_url" {

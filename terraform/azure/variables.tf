@@ -86,3 +86,15 @@ variable "mail_client_secret" {
   sensitive   = true
   default     = ""
 }
+
+variable "admin_emails" {
+  description = "Comma-separated Entra UPNs / preferred_usernames allowed to hit admin endpoints. If empty the API rejects all admin calls."
+  type        = string
+  default     = ""
+}
+
+variable "custom_domain" {
+  description = "Custom domain for the Front Door endpoint (e.g. wyrthco.com). Leave blank to use the azurefd.net hostname."
+  type        = string
+  default     = ""
+}

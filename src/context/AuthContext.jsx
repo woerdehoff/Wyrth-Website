@@ -7,7 +7,10 @@ const API_URL          = import.meta.env.VITE_CONTENT_API_URL  || ''
 const AuthContext = createContext({ user: null, token: null, login: () => {}, logout: () => {}, sendMagicLink: async () => {}, verifyMagicLink: async () => {}, googleClientId: '', magicLinkEnabled: false })
 
 function parseJwtPayload(token) {
-  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(base64))
+  } catch { return null }
 }
 
 export function AuthProvider({ children }) {
@@ -31,7 +34,12 @@ export function AuthProvider({ children }) {
   function login(credential) {
     const payload = parseJwtPayload(credential)
     if (!payload) return
-    const userData = { sub: payload.sub, name: payload.name || '', email: payload.email, picture: payload.picture || null }
+    const userData = {
+      sub: payload.sub,
+      name: payload.name || payload.email?.split('@')[0] || '',
+      email: payload.email,
+      picture: payload.picture || null,
+    }
     setToken(credential)
     setUser(userData)
     localStorage.setItem('wyrth_token', credential)

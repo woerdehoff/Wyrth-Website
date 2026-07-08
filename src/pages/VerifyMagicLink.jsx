@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -8,8 +8,12 @@ export default function VerifyMagicLink() {
   const navigate         = useNavigate()
   const [status, setStatus] = useState('verifying')
   const [errMsg, setErrMsg] = useState('')
+  const started = useRef(false)
 
   useEffect(() => {
+    if (started.current) return
+    started.current = true
+
     const token = searchParams.get('token') || ''
     if (!token) {
       setErrMsg('No sign-in token found. The link may be malformed.')
@@ -26,7 +30,7 @@ export default function VerifyMagicLink() {
         setErrMsg(err.message || 'This sign-in link is invalid or has expired.')
         setStatus('error')
       })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigate, searchParams, verifyMagicLink])
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 p-8">

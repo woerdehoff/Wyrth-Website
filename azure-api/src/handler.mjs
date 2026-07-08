@@ -16,6 +16,18 @@ const GOOGLE_CLIENT_ID      = process.env.GOOGLE_CLIENT_ID
 const MAIL_FROM             = process.env.MAIL_FROM
 const JWT_SECRET            = process.env.JWT_SECRET || ''
 
+// Admin allowlist — Entra tokens are only accepted for users on this list.
+// Set ADMIN_EMAILS as a comma-separated list of preferred_username / email / upn values.
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const ALLOWED_UPLOAD_EXTS  = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif'])
+
 let entraJwksCache = null, entraJwksCacheTime = 0
 let googleJwksCache = null, googleJwksCacheTime = 0
 const JWKS_TTL = 3_600_000
@@ -25,6 +37,19 @@ function signHs256Jwt(payload) {
   const body   = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const sig    = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url')
   return `${header}.${body}.${sig}`
+}
+
+function verifyHs256Jwt(token) {
+  if (!JWT_SECRET) throw new Error('Magic link not configured')
+  const parts = token.split('.')
+  if (parts.length !== 3) throw new Error('Malformed JWT')
+  const expected = createHmac('sha256', JWT_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url')
+  const expBuf = Buffer.from(expected)
+  const actBuf = Buffer.from(parts[2])
+  if (expBuf.length !== actBuf.length || !timingSafeEqual(expBuf, actBuf)) throw new Error('Invalid signature')
+  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired')
+  return payload
 }
 
 async function getEntraJwks() {
@@ -71,10 +96,15 @@ async function verifyRS256(token, getJwks, { audience, issuer }) {
 
 async function verifyEntraToken(authHeader) {
   if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
-  return verifyRS256(authHeader.slice(7), getEntraJwks, {
+  const payload = await verifyRS256(authHeader.slice(7), getEntraJwks, {
     audience: CLIENT_ID,
     issuer: `https://login.microsoftonline.com/${TENANT_ID}/v2.0`,
   })
+  // Fail secure: without an allowlist a valid tenant token would otherwise grant admin.
+  if (ADMIN_EMAILS.size === 0) throw new Error('Admin allowlist not configured')
+  const email = String(payload.preferred_username || payload.email || payload.upn || '').toLowerCase()
+  if (!email || !ADMIN_EMAILS.has(email)) throw new Error('Not authorized')
+  return payload
 }
 
 async function verifyGoogleToken(authHeader) {
@@ -83,6 +113,14 @@ async function verifyGoogleToken(authHeader) {
     audience: GOOGLE_CLIENT_ID,
     issuer: ['https://accounts.google.com', 'accounts.google.com'],
   })
+}
+
+async function verifyCustomerToken(authHeader) {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing bearer token')
+  const token = authHeader.slice(7)
+  const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'))
+  if (header.alg === 'HS256') return verifyHs256Jwt(token)
+  return verifyGoogleToken(authHeader)
 }
 
 function stripeAuth() {
@@ -98,6 +136,15 @@ async function stripePost(path, params) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error?.message || 'Stripe error')
   return data
+}
+
+function isSafeLinkUrl(str) {
+  if (typeof str !== 'string' || str === '') return true
+  if (str.startsWith('/')) return true
+  try {
+    const u = new URL(str)
+    return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'mailto:'
+  } catch { return false }
 }
 
 function verifyStripeSignature(rawBody, header) {
@@ -126,6 +173,9 @@ async function handlePostContent(event) {
   }
   if (!body.content || typeof body.content !== 'object') {
     return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Missing content' }) }
+  }
+  if (!isSafeLinkUrl(body.content.announcement?.link)) {
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'announcement.link must be http(s), mailto, or a site-relative path' }) }
   }
   await storage.putContentJson(body.content)
   return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true }) }
@@ -254,7 +304,7 @@ async function handleGetOrders(event) {
 
 async function handleGetCart(event) {
   let user
-  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  try { user = await verifyCustomerToken(event.headers?.authorization ?? event.headers?.Authorization) }
   catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
   const cart = await db.getDoc('carts', 'userId', user.sub)
   const items = cart ? JSON.parse(cart.items || '[]') : []
@@ -263,7 +313,7 @@ async function handleGetCart(event) {
 
 async function handleSaveCart(event) {
   let user
-  try { user = await verifyGoogleToken(event.headers?.authorization ?? event.headers?.Authorization) }
+  try { user = await verifyCustomerToken(event.headers?.authorization ?? event.headers?.Authorization) }
   catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
@@ -288,9 +338,15 @@ async function handleSaveCart(event) {
 async function handleUploadUrl(event) {
   try { await verifyEntraToken(event.headers?.authorization ?? event.headers?.Authorization) }
   catch (err) { return { statusCode: 401, headers: cors(), body: JSON.stringify({ error: `Unauthorized: ${err.message}` }) } }
-  const body = JSON.parse(event.body || '{}')
-  const ext = (body.ext || 'jpg').replace(/[^a-z0-9]/gi, '').slice(0, 10)
-  const contentType = (body.contentType || 'image/jpeg').slice(0, 100)
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch {
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Invalid JSON' }) }
+  }
+  const ext = String(body.ext || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
+  const contentType = String(body.contentType || 'image/jpeg').toLowerCase().slice(0, 100)
+  if (!ALLOWED_UPLOAD_EXTS.has(ext) || !ALLOWED_UPLOAD_TYPES.has(contentType)) {
+    return { statusCode: 400, headers: cors(), body: JSON.stringify({ error: 'Only image uploads (jpg, jpeg, png, webp, gif) are allowed' }) }
+  }
   const { uploadUrl, publicUrl } = await storage.createUploadUrl(ext, contentType)
   return { statusCode: 200, headers: cors(), body: JSON.stringify({ uploadUrl, publicUrl }) }
 }

@@ -120,6 +120,8 @@ ENTRA_CLIENT_ID=$(terraform output -raw entra_client_id 2>/dev/null || echo "")
 STORAGE_ACCOUNT=$(terraform output -raw storage_account_name 2>/dev/null || echo "")
 RG_NAME=$(terraform output -raw resource_group_name 2>/dev/null || echo "")
 FUNC_APP=$(terraform output -raw function_app_name 2>/dev/null || echo "wyrth-website-${ENV}-api")
+FD_HOST=$(terraform output -raw front_door_hostname 2>/dev/null || echo "")
+DNS_TOKEN=$(terraform output -raw custom_domain_validation_token 2>/dev/null || echo "")
 
 cd "$SCRIPT_DIR"
 
@@ -149,6 +151,28 @@ if ! $SKIP_DEPLOY && ! $SKIP_BUILD; then
     --source dist/ \
     --overwrite \
     --only-show-errors
+  # index.html must not be cached — it references hashed asset bundles that change each deploy
+  az storage blob upload \
+    --account-name "$STORAGE_ACCOUNT" \
+    --account-key "$STORAGE_KEY" \
+    --container-name '$web' \
+    --name index.html \
+    --file dist/index.html \
+    --content-cache "no-cache, no-store, must-revalidate" \
+    --overwrite \
+    --only-show-errors
+
+  FD_PROFILE="${FUNC_APP/-api/-fd}"
+  FD_ENDPOINT="${FUNC_APP%-api}"
+  echo "→ Purging Front Door cache..."
+  az afd endpoint purge \
+    --resource-group "$RG_NAME" \
+    --profile-name "$FD_PROFILE" \
+    --endpoint-name "$FD_ENDPOINT" \
+    --domains "${SITE_URL#https://}" \
+    --content-paths '/*' \
+    --no-wait \
+    --only-show-errors 2>/dev/null || true
 
   echo "→ Deploying Azure Functions API..."
   az functionapp deployment source config-zip \
@@ -160,8 +184,18 @@ if ! $SKIP_DEPLOY && ! $SKIP_BUILD; then
 
   echo
   echo "✅ Azure deployment complete!"
-  echo "🌐 Site:  https://${CDN_HOST}"
+  echo "🌐 Site:  ${SITE_URL}"
   echo "🔌 API:   ${CONTENT_API_URL}"
+  if [[ -n "$FD_HOST" && -n "$DNS_TOKEN" && "$DNS_TOKEN" != "null" ]]; then
+    FD_CNAME="${FD_HOST#https://}"
+    CUSTOM_HOST="${SITE_URL#https://}"
+    CUSTOM_LABEL="${CUSTOM_HOST%%.*}"
+    echo
+    echo "📋 GoDaddy DNS (required for HTTPS on ${CUSTOM_HOST}):"
+    echo "   CNAME  ${CUSTOM_LABEL}  →  ${FD_CNAME}"
+    echo "   TXT    _dnsauth.${CUSTOM_LABEL}  →  ${DNS_TOKEN}"
+    echo "   Remove any CNAME pointing ${CUSTOM_LABEL} at *.web.core.windows.net"
+  fi
 else
   echo "Build artifacts ready (not deployed)."
 fi

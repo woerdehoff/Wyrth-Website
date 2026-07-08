@@ -3,9 +3,19 @@ import { useContent } from '../context/ContentContext'
 
 const STORAGE_KEY = 'wyrth:announcement-dismissed'
 
+function safeHref(href) {
+  if (typeof href !== 'string' || !href) return null
+  if (href.startsWith('/')) return href
+  try {
+    const u = new URL(href)
+    return (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'mailto:') ? href : null
+  } catch { return null }
+}
+
 export default function AnnouncementBanner() {
   const { announcement } = useContent()
   const message = announcement?.message
+  const linkHref = safeHref(announcement?.link)
   const [dismissed, setDismissed] = useState(true)
 
   useEffect(() => {
@@ -30,8 +40,8 @@ export default function AnnouncementBanner() {
       role="banner"
     >
       <span className="inline">
-        {announcement.link
-          ? <a href={announcement.link} target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2">{message}</a>
+        {linkHref
+          ? <a href={linkHref} target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2">{message}</a>
           : message
         }
       </span>
