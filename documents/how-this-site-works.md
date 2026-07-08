@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Wyrth-Website is a static React app hosted on AWS. It is a premium editorial redesign of [wyrthco.com](https://wyrthco.com) — a professional salon cape brand. All site content (headlines, copy, audience cards, features, announcement banner) is editable through an admin page protected by Microsoft Entra ID SSO. The site also includes a custom shop — replacing Shopify — with a Google-authenticated shopping cart backed by DynamoDB.
+The Wyrth-Website is a static React app hosted on Azure. It is a premium editorial redesign of [wyrthco.com](https://wyrthco.com) — a professional salon cape brand. All site content (headlines, copy, audience cards, features, announcement banner) is editable through an admin page protected by Microsoft Entra ID SSO. The site also includes a custom shop — replacing Shopify — with a Google-authenticated shopping cart backed by Azure Cosmos DB.
 
 ---
 
@@ -11,13 +11,13 @@ The Wyrth-Website is a static React app hosted on AWS. It is a premium editorial
 | Layer | Technology |
 |---|---------|
 | Frontend | React 19 + Vite |
-| Hosting | AWS S3 (private bucket) |
-| CDN / HTTPS | AWS CloudFront |
-| API | AWS Lambda (Node.js 22) + API Gateway HTTP v2 |
+| Hosting | Azure Static Website (Blob Storage `$web` container) |
+| CDN / HTTPS | Azure Front Door |
+| API | Azure Functions (Node.js 22) |
 | Admin Auth | Microsoft Entra ID (MSAL / SSO) |
 | Customer Auth | Google Identity Services + Magic Link (passwordless email) |
-| Email | AWS SES v2 |
-| Shop / Cart | AWS DynamoDB (PAY_PER_REQUEST) |
+| Email | Microsoft Graph API |
+| Shop / Cart | Azure Cosmos DB (NoSQL) |
 | Payments | Stripe (stubbed in POC — redirect to Shopify) |
 | Infrastructure | Terraform |
 
@@ -25,53 +25,46 @@ The Wyrth-Website is a static React app hosted on AWS. It is a premium editorial
 
 ## Environments
 
-Three environments are deployed to the same AWS account. Each has its own S3 bucket, CloudFront distribution, Lambda, API Gateway, and DynamoDB tables.
-
-| Environment | S3 Bucket | CloudFront | Content API |
-|---|---|---|---|
-| **prod** | `wyrthco-website` | `E18DWUHK7XG807` | `https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com` |
-| **test** | `wyrthco-website-test` | (varies) | (varies) |
-| **dev** | `wyrthco-website-dev` | `EJTKH2O123SKG` | `https://54roo7ti6d.execute-api.us-east-1.amazonaws.com` |
+Three environments are deployed to the same Azure subscription. Each has its own Storage Account, Front Door endpoint, Function App, and Cosmos DB containers.
 
 | Shared Resource | Value |
 |---|---|
-| Terraform State Bucket | `wyrth-website-tfstate` |
+| Terraform State Storage | `wyrthwebsitetfstate` (resource group `wyrth-website-tfstate`) |
 | Entra Tenant ID | `4c061c09-139b-4718-969f-b9b491911d8a` |
 | Entra Client ID (App Reg) | `8938c729-223c-4481-8a20-34a5694b825f` |
-| DynamoDB Table Pattern | `wyrth-website-{env}-products`, `-orders`, `-carts`, `-magic-tokens` |
+| Cosmos DB Container Pattern | `products`, `orders`, `carts`, `magic-tokens` (per-env database) |
 
 ---
 
 ## How the Site is Hosted
 
 1. The React app is built with `npm run build`, producing static files in `dist/`
-2. Those files are uploaded to a **private S3 bucket**
-3. **CloudFront** sits in front of S3 — it handles HTTPS, caching, and serves `index.html` for all routes (enabling React Router navigation, including `/admin`)
-4. Visitors never touch S3 directly — only CloudFront can read the bucket via Origin Access Identity (OAI)
+2. Those files are uploaded to an Azure Storage Account's **`$web` container** (static website hosting)
+3. **Azure Front Door** sits in front of Storage — it handles HTTPS, caching, custom domain, and serves `index.html` for all routes (enabling React Router navigation, including `/admin`)
+4. Visitors never access Storage directly — only Front Door serves the content
 
 ---
 
 ## CI/CD (Terminal Deploy)
 
-There is no longer a Jenkins server. All deployments are done from the terminal using the provided `deploy.sh` script.
+All deployments are done from the terminal using `deploy-azure.sh`.
 
-The script performs the same steps the old Jenkins pipeline used to do:
-- Correct remote Terraform state per environment
-- Injects secrets via `TF_VAR_*` environment variables (or `secrets*.tfvars`)
-- Builds the React app with the right `VITE_*` variables from Terraform outputs
-- Deploys to S3 + invalidates CloudFront
+The script:
+- Runs Terraform (init + apply) against the Azure backend
+- Builds the React app with `VITE_*` variables from Terraform outputs
+- Uploads static files to the Azure Storage `$web` container
+- Purges the Front Door cache
+- Deploys the Function App zip
 
 ### Environment mapping
 
-| `--env` flag | Environment | S3 Bucket | Terraform state key |
-|--------------|-------------|-----------|---------------------|
-| `dev`        | dev         | `wyrthco-website-dev` | `wyrth-website/dev/terraform.tfstate` |
-| `test`       | test        | `wyrthco-website-test` | `wyrth-website/test/terraform.tfstate` |
-| `prod`       | prod        | `wyrthco-website` | `wyrth-website/prod/terraform.tfstate` |
+| `--env` flag | Terraform state key |
+|---|---|
+| `dev` | `wyrth-website-azure/dev/terraform.tfstate` |
+| `test` | `wyrth-website-azure/test/terraform.tfstate` |
+| `prod` | `wyrth-website-azure/prod/terraform.tfstate` |
 
 ### Browser tab title per environment
-
-The Vite build injects a `__APP_TITLE__` constant based on `VITE_APP_ENV`:
 
 | Environment | Tab title |
 |---|---|
@@ -82,46 +75,40 @@ The Vite build injects a `__APP_TITLE__` constant based on `VITE_APP_ENV`:
 ### Running a deployment
 
 ```bash
-# Basic usage
-./deploy.sh --env dev
-./deploy.sh --env test
-./deploy.sh --env prod
-
-# Using npm scripts (convenience)
-npm run deploy:dev
-npm run deploy:test
-npm run deploy:prod
+./deploy-azure.sh --env dev
+./deploy-azure.sh --env test
+./deploy-azure.sh --env prod
 
 # Plan only (no changes)
-./deploy.sh --env dev --plan
+./deploy-azure.sh --env dev --plan
 
 # Supply secrets via environment (recommended)
+JWT_SECRET=... \
+MAIL_CLIENT_ID=... \
+MAIL_CLIENT_SECRET=... \
 STRIPE_SECRET_KEY=sk_live_xxx \
 STRIPE_WEBHOOK_SECRET=whsec_xxx \
-JWT_SECRET=... \
-./deploy.sh --env prod --yes
+./deploy-azure.sh --env prod --yes
 ```
 
-See `./deploy.sh --help` for all options (`--skip-infra`, `--skip-build`, etc.).
+See `./deploy-azure.sh --help` for all options (`--skip-infra`, `--skip-build`, etc.).
 
-Secrets are never stored in the repository. Use environment variables or a local `terraform/secrets.tfvars` file.
+Secrets are never stored in the repository. Use environment variables or a local `terraform/azure/secrets.tfvars` file.
 
 ---
 
 ## How Content Editing Works
 
-All editable text lives in one place: `src/content.js` — this is the **default content**. When the site loads, it fetches `/content` from the Lambda API. If live content exists (previously saved to S3 as `content.json`), it overrides the defaults. If not, the hardcoded defaults from `content.js` are used as a fallback.
+All editable text lives in one place: `src/content.js` — this is the **default content**. When the site loads, it fetches `/content` from the Azure Functions API. If live content exists (previously saved to blob storage as `content.json`), it overrides the defaults. If not, the hardcoded defaults from `content.js` are used as a fallback.
 
 ```
 Browser loads site
-  → fetches {CONTENT_API_URL}/content  (Lambda reads content.json from S3)
+  → fetches {CONTENT_API_URL}/content  (Function App reads content.json from blob storage)
   → if found: overrides default text
   → if not found: uses defaults from src/content.js
 ```
 
 ### Content Sections
-
-The content system covers:
 
 | Section | What it controls |
 |---|---|
@@ -152,33 +139,33 @@ When you click **Publish Changes**:
 
 1. MSAL acquires the ID token silently (`acquireTokenSilent`)
 2. The browser sends the full content JSON + `Authorization: Bearer <id_token>` to `POST /content`
-3. **Lambda** validates the JWT:
+3. **Azure Functions** validates the JWT:
    - Fetches JWKS from `https://login.microsoftonline.com/{tenantId}/discovery/v2.0/keys` (1-hour module-level cache)
    - Verifies RS256 signature using Node.js built-in `node:crypto` (no external deps)
    - Checks `aud === CLIENT_ID`, `iss`, `exp`, `nbf`
-4. Lambda writes `content.json` to the S3 bucket
-5. Lambda issues a **CloudFront invalidation** for `/content.json` so the CDN serves the fresh version immediately
+4. Function writes `content.json` to the blob storage container
+5. Function purges the Front Door cache so CDN serves the fresh version immediately
 6. All visitors see the updated content within seconds
 
 ### Entra App Registration requirements
 
 The App Registration must have the following redirect URIs configured under **Authentication → Single-page application**:
 
-- `https://d1detsumoaola0.cloudfront.net` (production)
+- The Front Door / custom domain URL (production)
 - `http://localhost:5173` (local dev)
 
 ---
 
 ## Shop & Cart
 
-The site includes a custom e-commerce shop at `/shop`, replacing the $41/month Shopify subscription with a self-hosted AWS stack.
+The site includes a custom e-commerce shop at `/shop`, replacing the $41/month Shopify subscription.
 
 ### How the shop works
 
-- Products are stored in DynamoDB (`wyrth-website-products`) and managed through `/admin` → Products tab
-- The public `/shop` page fetches `GET /shop/products` from Lambda (no auth required)
+- Products are stored in Cosmos DB (`products` container) and managed through `/admin` → Products tab
+- The public `/shop` page fetches `GET /shop/products` from the Function App (no auth required)
 - Customers sign in with Google to add items to their cart
-- The cart is stored in DynamoDB (`wyrth-website-carts`) with a 30-day TTL — it survives page refreshes
+- The cart is stored in Cosmos DB (`carts` container) with a 30-day TTL — it survives page refreshes
 - Checkout in POC mode redirects to `wyrthco.com` on Shopify; once Stripe is wired in it will be self-hosted
 
 ### Customer auth (Google Sign-In + Magic Link)
@@ -190,36 +177,28 @@ Customers have two sign-in options — both are passwordless:
 1. Customer clicks the **Sign In** button in the nav to open the dropdown
 2. Selects the Google option — a pop-up authenticates and returns a signed ID token (JWT)
 3. The token is stored in `localStorage` (`wyrth_token`) and sent as `Authorization: Bearer` to cart endpoints
-4. Lambda verifies the Google JWT using Google's JWKS endpoint with no external dependencies
+4. The Function App verifies the Google JWT using Google's JWKS endpoint with no external dependencies
 5. Clicking the user avatar in the nav signs out and clears the cart from the UI
 
 **Magic Link (passwordless email)**
 
-1. Customer clicks the **Sign In** button in the nav to open the dropdown, then selects **"Sign in with Email"** (or uses the same option in the mobile hamburger menu)
+1. Customer clicks the **Sign In** button in the nav to open the dropdown, then selects **"Sign in with Email"**
 2. A modal prompts for their email address
-3. `POST /auth/magic/send` — Lambda generates a UUID token, stores it in DynamoDB (`wyrth-website-magic-tokens`) with a 15-minute TTL, and sends a branded sign-in email via AWS SES
+3. `POST /auth/magic/send` — the Function generates a UUID token, stores it in Cosmos DB (`magic-tokens` container) with a 15-minute TTL, and sends a branded sign-in email via Microsoft Graph
 4. Customer clicks the link in their email → lands on `/auth/verify?token=…`
-5. `GET /auth/magic/verify` — Lambda looks up the token (single-use, deleted immediately), then returns a self-issued HMAC-HS256 JWT (30-day expiry)
-6. The frontend stores the JWT in `localStorage` identically to Google sign-in — the rest of the app (cart, etc.) works the same way
+5. `GET /auth/magic/verify` — Function looks up the token (single-use, deleted immediately), then returns a self-issued HMAC-HS256 JWT (30-day expiry)
+6. The frontend stores the JWT in `localStorage` identically to Google sign-in
 
 ### Google OAuth setup (one-time)
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com) → **APIs & Services → Credentials**
 2. **+ Create Credentials → OAuth 2.0 Client ID** → Web application
-3. Add `https://d1detsumoaola0.cloudfront.net` to **Authorized JavaScript origins**
-4. Copy the Client ID and add to `terraform/terraform.tfvars`:
+3. Add your site URL to **Authorized JavaScript origins**
+4. Copy the Client ID and add to `terraform/azure/dev.tfvars` (etc.):
    ```
    google_client_id = "YOUR_CLIENT_ID.apps.googleusercontent.com"
    ```
-5. Run `./deploy.sh` — the client ID is baked into both the Lambda env var and the React build
-
-### Magic Link setup (one-time)
-
-1. **Verify the From address in AWS SES** — go to SES → Verified identities → verify `noreply@wyrth.co` (or the domain)
-2. Supply the JWT secret at deploy time (via environment variable or `secrets.tfvars`):
-   - `JWT_SECRET=$(openssl rand -hex 32) ./deploy.sh --env prod`
-   - Same pattern for dev and test environments.
-3. `ses_from_email` is already set to `noreply@wyrth.co` in all `.tfvars` files
+5. Run `./deploy-azure.sh --env dev` — the client ID is baked into both the Function App env var and the React build
 
 ### Admin shop management (`/admin`)
 
@@ -239,20 +218,16 @@ Customers have two sign-in options — both are passwordless:
 | `GET` | `/shop/orders` | Entra JWT | List all orders (admin) |
 | `GET` | `/shop/cart` | Google JWT or Magic Link JWT | Load cart for signed-in user |
 | `POST` | `/shop/cart` | Google JWT or Magic Link JWT | Save cart for signed-in user |
-| `POST` | `/auth/magic/send` | None | Send magic link email via SES |
+| `POST` | `/auth/magic/send` | None | Send magic link email via Microsoft Graph |
 | `GET` | `/auth/magic/verify` | None (token in query string) | Verify token, return session JWT |
 
 ---
 
 ## How to Deploy
 
-All deployments are now performed from the terminal using `./deploy.sh`.
+All deployments are performed from the terminal using `./deploy-azure.sh`.
 
 ### Recommended workflow (trunk-based)
-
-Since deployment is now explicit via `--env`, you no longer need to maintain separate long-lived branches just to trigger different environments.
-
-A simple workflow:
 
 ```bash
 # 1. Work on main (or a short-lived feature branch)
@@ -261,58 +236,46 @@ git checkout main
 git add . && git commit -m "feat: something" && git push
 
 # 2. Deploy to dev for testing
-npm run deploy:dev
+./deploy-azure.sh --env dev
 
-# 3. When ready, deploy the same code to test
-npm run deploy:test
+# 3. When ready, deploy to test
+./deploy-azure.sh --env test
 
 # 4. When ready for production
-npm run deploy:prod     # includes a confirmation prompt
+./deploy-azure.sh --env prod   # includes a confirmation prompt
 ```
-
-You can deploy **any commit** to **any environment** at any time:
-
-```bash
-./deploy.sh --env dev
-./deploy.sh --env test
-./deploy.sh --env prod --yes
-```
-
-Separate `dev` and `test` branches are now **optional**. You can keep them for a promotion workflow if you prefer, but they are no longer required.
 
 ### Passing secrets
 
-The three sensitive values are **not** stored in git:
-
 ```bash
+JWT_SECRET=... \
+MAIL_CLIENT_ID=... \
+MAIL_CLIENT_SECRET=... \
 STRIPE_SECRET_KEY=sk_... \
 STRIPE_WEBHOOK_SECRET=whsec_... \
-JWT_SECRET=$(openssl rand -hex 32) \
-./deploy.sh --env prod
+./deploy-azure.sh --env prod --yes
 ```
 
-You can also create `terraform/secrets.tfvars` (gitignored) if you prefer a file.
+You can also create `terraform/azure/secrets.tfvars` (gitignored) if you prefer a file.
 
 ### First-time environment setup
 
 ```bash
-# The first time for any environment, Terraform will create remote state
-cd terraform
-terraform init -backend-config="key=wyrth-website/dev/terraform.tfstate"
-cd ..
+# Bootstrap Terraform state storage (one-time)
+az group create -n wyrth-website-tfstate -l eastus
+az storage account create -n wyrthwebsitetfstate -g wyrth-website-tfstate -l eastus --sku Standard_LRS
+az storage container create -n tfstate --account-name wyrthwebsitetfstate
 
-# Then deploy normally
-./deploy.sh --env dev
+# Then deploy
+./deploy-azure.sh --env dev
 ```
-
-The per-environment `.tfvars` files (`dev.tfvars`, `test.tfvars`, `prod.tfvars`) contain the non-secret values and are committed. Secrets must be supplied at deploy time via `TF_VAR_*` (the script maps common env var names) or a local secrets file.
 
 ### Running locally
 
 ```bash
 npm install
-VITE_CONTENT_API_URL="https://jxc2aawsfa.execute-api.us-east-1.amazonaws.com/" \
-VITE_GOOGLE_CLIENT_ID="" \
+VITE_CONTENT_API_URL="<your-dev-function-url>" \
+VITE_GOOGLE_CLIENT_ID="<your-google-client-id>" \
 npm run dev
 # Admin at: http://localhost:5173/admin
 ```
@@ -323,8 +286,7 @@ npm run dev
 
 ```
 Wyrth-Website/
-├── deploy.sh                       ← Multi-env terminal deploy (replaces Jenkins)
-├── Jenkinsfile                     ← (deprecated) old Jenkins pipeline — safe to ignore
+├── deploy-azure.sh                 ← Multi-env terminal deploy
 ├── vite.config.js                  ← Reads VITE_APP_ENV to set browser tab title at build time
 ├── src/
 │   ├── content.js                  ← Default text for every section (fallback)
@@ -335,7 +297,7 @@ Wyrth-Website/
 │   ├── context/
 │   │   ├── ContentContext.jsx      ← Fetches /content on load, provides content to all components
 │   │   ├── AuthContext.jsx         ← Google OAuth + magic link context (user state, login/logout, sendMagicLink, verifyMagicLink)
-│   │   └── CartContext.jsx         ← Cart state + debounced DynamoDB sync via /shop/cart
+│   │   └── CartContext.jsx         ← Cart state + debounced Cosmos DB sync via /shop/cart
 │   ├── pages/
 │   │   ├── Admin.jsx               ← Entra-gated CMS + Products + Orders tabs
 │   │   ├── Shop.jsx                ← Product listing — Google login prompt or Add to Cart
@@ -353,56 +315,47 @@ Wyrth-Website/
 │       ├── Features.jsx
 │       ├── Statement.jsx
 │       └── Footer.jsx
-├── lambda/
-│   └── index.mjs                   ← All API routes: content + shop + cart (Entra + Google JWT auth)
-├── terraform/
-│   ├── main.tf                     ← Provider + S3 partial backend (key passed per-env at init time)
-│   ├── s3.tf                       ← S3 bucket + OAI bucket policy
-│   ├── cloudfront.tf               ← CloudFront distribution
-│   ├── lambda.tf                   ← Lambda + API Gateway + IAM (S3, CloudFront, DynamoDB, SES)
-│   ├── dynamodb.tf                 ← products, orders, carts, magic-tokens tables
-│   ├── variables.tf                ← All input variables (bucket, entra, google, stripe, ses, jwt_secret, site_url, environment)
-│   ├── outputs.tf                  ← Outputs including google_client_id for deploy.sh
-│   ├── dev.tfvars                  ← Dev environment values (committed — no secrets)
-│   ├── test.tfvars                 ← Test environment values (committed — no secrets)
-│   ├── prod.tfvars                 ← Prod environment values (committed — no secrets)
-│   ├── terraform.tfvars            ← Local overrides (not committed to git)
-│   └── example.tfvars              ← Template to copy
-└── documents/
-    ├── how-this-site-works.md      ← This file
-    ├── goal.md                     ← Project goal + Stripe TODO list
-    └── ideas.md
+├── azure-api/
+│   └── src/handler.mjs             ← All API routes: content + shop + cart (Entra + Google JWT auth)
+└── terraform/
+    └── azure/
+        ├── main.tf                 ← Provider + Azure backend (key passed per-env at init time)
+        ├── function.tf             ← Function App + App Service Plan + Storage
+        ├── frontdoor.tf            ← Azure Front Door (CDN, HTTPS, custom domain)
+        ├── cosmos.tf               ← Cosmos DB account + databases + containers
+        ├── variables.tf            ← All input variables
+        ├── outputs.tf              ← Outputs used by deploy-azure.sh
+        ├── dev.tfvars              ← Dev environment values (committed — no secrets)
+        ├── test.tfvars             ← Test environment values (committed — no secrets)
+        └── prod.tfvars             ← Prod environment values (committed — no secrets)
 ```
 
 ---
 
-## AWS Resources
+## Azure Resources
 
-All resources below are created per environment. The prod names are shown; dev and test append `-dev` / `-test` to the project names.
+All resources below are created per environment.
 
-| Resource | Prod Name | Purpose |
-|---|---|---|
-| S3 Bucket | `wyrthco-website` | Stores built site files + `content.json` |
-| CloudFront Distribution | `E18DWUHK7XG807` | CDN, HTTPS, SPA routing (`/admin`, `/*` → `index.html`) |
-| Lambda Function | `wyrth-website-content-api` | All API routes: content, shop, cart, auth |
-| API Gateway (HTTP v2) | `wyrth-website-content-api` | Public HTTPS endpoint for all routes |
-| IAM Role | `wyrth-website-content-api-role` | Lets Lambda read/write S3, CloudFront, DynamoDB, and send SES email |
-| DynamoDB Tables | `wyrth-website-{env}-*` | products, orders, carts, magic-tokens |
-| S3 Bucket (Terraform state) | `wyrth-website-tfstate` | Remote Terraform state for all environments |
+| Resource | Purpose |
+|---|---|
+| Resource Group | Scopes all per-env resources |
+| Storage Account | Static website hosting (`$web` container) + blob storage for `content.json` |
+| Azure Front Door | CDN, HTTPS, SPA routing (`/*` → `index.html`), custom domain |
+| Function App (Linux) | All API routes: content, shop, cart, auth |
+| App Service Plan | Consumption plan for the Function App |
+| Cosmos DB Account | NoSQL database (products, orders, carts, magic-tokens) |
 
 ---
 
 ## Security Notes
 
-- The S3 bucket is **fully private** — only CloudFront can read it via OAI
 - Admin auth uses **Microsoft Entra ID** — no passwords stored anywhere
 - Customer auth supports **Google Sign-In** (RS256 JWT via Google JWKS) and **Magic Link** (HMAC-HS256 JWT signed with `JWT_SECRET`)
-- Magic link tokens are **single-use** — deleted from DynamoDB on first verification
+- Magic link tokens are **single-use** — deleted from Cosmos DB on first verification
 - Magic link tokens expire in **15 minutes**; session JWTs last 30 days
-- JWT validation uses **Node.js built-in `node:crypto`** — no external npm dependencies in Lambda
+- JWT validation uses **Node.js built-in `node:crypto`** — no external npm dependencies in the Function App
 - `JWT_SECRET` must be supplied at deploy time via env var or secrets file (never stored in code or committed tfvars)
 - Token claims validated: algorithm, expiry (`exp`), not-before (`nbf`), audience (`aud === CLIENT_ID`), issuer (`iss`)
-- JWT validation uses **Node.js built-in `node:crypto`** — no external npm dependencies in Lambda
-- JWKS keys are **cached for 1 hour** in Lambda module scope (warm reuse)
-- `.env` and `terraform.tfvars` contain credentials and are **gitignored**
+- JWKS keys are **cached for 1 hour** in Function module scope (warm reuse)
+- `.env` and `secrets.tfvars` contain credentials and are **gitignored**
 - CORS on the API allows `Authorization` header only from the configured origins

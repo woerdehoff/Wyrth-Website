@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------
-# function.tf — Azure Functions API (Lambda + API Gateway equivalent)
+# function.tf — Azure Functions API
 # -----------------------------------------------------------------------
 
 resource "azurerm_service_plan" "api" {

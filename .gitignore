@@ -6,25 +6,14 @@ public/images/
 public/videos/
 .env
 *.tfvars
-!terraform/example.tfvars
-!terraform/dev.tfvars
-!terraform/test.tfvars
-!terraform/prod.tfvars
 !terraform/azure/example.tfvars
 !terraform/azure/dev.tfvars
 !terraform/azure/test.tfvars
 !terraform/azure/prod.tfvars
 
 # Never commit local secret overrides or active tfvars
-terraform/secrets*.tfvars
 terraform/azure/secrets*.tfvars
-terraform/terraform.tfvars
 
-terraform/.terraform/
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
-terraform/.terraform.lock.hcl
-lambda/function.zip
 terraform/azure/.terraform/
 terraform/azure/terraform.tfstate*
 terraform/azure/api-deploy.zip

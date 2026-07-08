@@ -15,7 +15,7 @@ export function CartProvider({ children }) {
   const [open,  setOpen]  = useState(false)
   const syncTimer = useRef(null)
 
-  // Fetch cart from DynamoDB when user logs in
+  // Fetch cart from Cosmos DB when user logs in
   useEffect(() => {
     if (token && API_URL) {
       fetch(`${API_URL}/shop/cart`, { headers: { Authorization: `Bearer ${token}` } })
@@ -27,7 +27,7 @@ export function CartProvider({ children }) {
     }
   }, [token])
 
-  // Debounced sync to DynamoDB — fires 1s after last cart change
+  // Debounced sync to Cosmos DB — fires 1s after last cart change
   const scheduleSync = useCallback((nextItems) => {
     if (!token || !API_URL) return
     clearTimeout(syncTimer.current)

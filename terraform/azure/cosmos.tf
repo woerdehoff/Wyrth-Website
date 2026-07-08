@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------
-# cosmos.tf — Cosmos DB (DynamoDB equivalent), serverless SQL API
+# cosmos.tf — Cosmos DB, serverless NoSQL API
 # -----------------------------------------------------------------------
 
 resource "azurerm_cosmosdb_account" "main" {

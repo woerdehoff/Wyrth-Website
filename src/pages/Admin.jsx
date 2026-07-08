@@ -730,7 +730,7 @@ function ProductsTab({ products, onSave, onDelete, status, onUploadImage }) {
   return (
     <section className="atab">
       <h2 className="atab__title">{editing ? 'Edit Product' : 'Add Product'}</h2>
-      <p className="atab__desc">Products are stored in DynamoDB and shown on the /shop page.</p>
+      <p className="atab__desc">Products are stored in Cosmos DB and shown on the /shop page.</p>
 
       <div className="products-tab__layout">
         <div className="products-tab__form">
@@ -1217,7 +1217,7 @@ function AdminPanel() {
   async function uploadImage(file) {
     if (!CONTENT_API_URL) return null
     const token = await getToken()
-    // Get presigned URL from Lambda
+    // Get presigned URL from the API
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const res = await fetch(`${CONTENT_API_URL}/shop/upload-url`, {
       method: 'POST',
@@ -1226,7 +1226,7 @@ function AdminPanel() {
     })
     if (!res.ok) throw new Error('Failed to get upload URL')
     const { uploadUrl, publicUrl } = await res.json()
-    // Upload directly to S3
+    // Upload directly to Azure Blob Storage
     await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': file.type },

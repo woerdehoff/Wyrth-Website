@@ -3,18 +3,18 @@ import { defaultContent, normalizeContent } from '../content'
 
 const ContentContext = createContext({ content: defaultContent, setContent: () => {} })
 
-const CLOUDFRONT_URL     = import.meta.env.VITE_CLOUDFRONT_URL
+const CDN_URL            = import.meta.env.VITE_CDN_URL
 const CONTENT_API_URL    = import.meta.env.VITE_CONTENT_API_URL
 
 export function ContentProvider({ children }) {
   const [content, setContent] = useState(defaultContent)
 
   useEffect(() => {
-    // Try to load live content from the API (bypasses CloudFront cache)
+    // Try to load live content from the API (bypasses CDN cache)
     const url = CONTENT_API_URL
       ? `${CONTENT_API_URL}/content`
-      : CLOUDFRONT_URL
-        ? `${CLOUDFRONT_URL}/content.json?_=${Date.now()}`
+      : CDN_URL
+        ? `${CDN_URL}/content.json?_=${Date.now()}`
         : null
 
     if (!url) return

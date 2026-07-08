@@ -1,6 +1,5 @@
 # -----------------------------------------------------------------------
 # main.tf — Azure infrastructure for Wyrth Website
-# Parallel stack to terraform/ (AWS). Uses separate remote state.
 # -----------------------------------------------------------------------
 
 terraform {

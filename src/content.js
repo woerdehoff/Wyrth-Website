@@ -1,5 +1,5 @@
 // Default content — mirrors what's hardcoded in components.
-// When content.json exists on S3, those values override these.
+// When content.json exists in blob storage, those values override these.
 
 export const capeStatDefaults = [
   { value: '4',    label: 'Years in Development' },
@@ -10,7 +10,7 @@ export const capeStatDefaults = [
 
 export const capeBadgeDefaults = ['Woman-Owned']
 
-// Default shop products — shown when DynamoDB has no active products yet (e.g. new env).
+// Default shop products — shown when Cosmos DB has no active products yet (e.g. new env).
 export const defaultProducts = [
   {
     productId:    'capsule-wardrobe-cape',
