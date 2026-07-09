@@ -72,6 +72,14 @@ resource "azurerm_linux_function_app" "api" {
   identity {
     type = "SystemAssigned"
   }
+
+  lifecycle {
+    ignore_changes = [
+      # Set by deploy-azure.sh zip deploy, not managed by Terraform
+      app_settings["WEBSITE_RUN_FROM_PACKAGE"],
+      app_settings["SCM_DO_BUILD_DURING_DEPLOYMENT"],
+    ]
+  }
 }
 
 # Function code is deployed via deploy-azure.sh (az functionapp deployment source config-zip)
