@@ -4,8 +4,8 @@
 
 resource "azurerm_cosmosdb_account" "main" {
   name                = replace("${var.project_name}-${var.environment}", "-", "")
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
   tags                = local.tags
@@ -15,7 +15,7 @@ resource "azurerm_cosmosdb_account" "main" {
   }
 
   geo_location {
-    location          = azurerm_resource_group.main.location
+    location          = data.azurerm_resource_group.main.location
     failover_priority = 0
   }
 
@@ -26,13 +26,13 @@ resource "azurerm_cosmosdb_account" "main" {
 
 resource "azurerm_cosmosdb_sql_database" "main" {
   name                = "wyrth"
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = data.azurerm_resource_group.main.name
   account_name        = azurerm_cosmosdb_account.main.name
 }
 
 resource "azurerm_cosmosdb_sql_container" "products" {
   name                  = "products"
-  resource_group_name   = azurerm_resource_group.main.name
+  resource_group_name   = data.azurerm_resource_group.main.name
   account_name          = azurerm_cosmosdb_account.main.name
   database_name         = azurerm_cosmosdb_sql_database.main.name
   partition_key_paths   = ["/productId"]
@@ -42,7 +42,7 @@ resource "azurerm_cosmosdb_sql_container" "products" {
 
 resource "azurerm_cosmosdb_sql_container" "orders" {
   name                  = "orders"
-  resource_group_name   = azurerm_resource_group.main.name
+  resource_group_name   = data.azurerm_resource_group.main.name
   account_name          = azurerm_cosmosdb_account.main.name
   database_name         = azurerm_cosmosdb_sql_database.main.name
   partition_key_paths   = ["/orderId"]
@@ -51,7 +51,7 @@ resource "azurerm_cosmosdb_sql_container" "orders" {
 
 resource "azurerm_cosmosdb_sql_container" "carts" {
   name                  = "carts"
-  resource_group_name   = azurerm_resource_group.main.name
+  resource_group_name   = data.azurerm_resource_group.main.name
   account_name          = azurerm_cosmosdb_account.main.name
   database_name         = azurerm_cosmosdb_sql_database.main.name
   partition_key_paths   = ["/userId"]
@@ -70,7 +70,7 @@ resource "azurerm_cosmosdb_sql_container" "carts" {
 
 resource "azurerm_cosmosdb_sql_container" "analytics" {
   name                  = "analytics"
-  resource_group_name   = azurerm_resource_group.main.name
+  resource_group_name   = data.azurerm_resource_group.main.name
   account_name          = azurerm_cosmosdb_account.main.name
   database_name         = azurerm_cosmosdb_sql_database.main.name
   partition_key_paths   = ["/pk"]
@@ -81,7 +81,7 @@ resource "azurerm_cosmosdb_sql_container" "analytics" {
 
 resource "azurerm_cosmosdb_sql_container" "magic_tokens" {
   name                  = "magic-tokens"
-  resource_group_name   = azurerm_resource_group.main.name
+  resource_group_name   = data.azurerm_resource_group.main.name
   account_name          = azurerm_cosmosdb_account.main.name
   database_name         = azurerm_cosmosdb_sql_database.main.name
   partition_key_paths   = ["/token"]

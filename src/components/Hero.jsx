@@ -2,8 +2,6 @@ import { Link } from 'react-router-dom'
 import { useContent } from '../context/ContentContext'
 import SignInPrompt from './SignInPrompt'
 
-const IS_DEV_SITE = import.meta.env.VITE_APP_ENV?.includes('DEV')
-
 export default function Hero() {
   const { hero } = useContent()
 
@@ -16,13 +14,6 @@ export default function Hero() {
         backgroundPosition: 'center 25%',
       }}
     >
-      {/* DEPLOY-PIPELINE-TEST — remove after verifying deployment */}
-      {IS_DEV_SITE && (
-        <div className="absolute top-24 left-4 z-10 px-3 py-1.5 rounded-sm border border-magenta/60 bg-ink/80 text-magenta text-[0.6rem] font-semibold tracking-[.2em] uppercase backdrop-blur-sm">
-          Pipeline test · Jul 8, 2026
-        </div>
-      )}
-
       <div
         className="relative z-[1] text-center w-full max-w-[900px] pt-24 pb-16 md:pt-40 md:pb-24"
         style={{ paddingLeft: '5%', paddingRight: '5%' }}

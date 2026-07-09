@@ -3,6 +3,9 @@ import { GoogleOAuthProvider, googleLogout } from '@react-oauth/google'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 const API_URL          = import.meta.env.VITE_CONTENT_API_URL  || ''
+// Flip to true once Google OAuth is fully wired end-to-end
+const GOOGLE_LOGIN_ENABLED = false
+const googleClientIdForUi = GOOGLE_LOGIN_ENABLED ? GOOGLE_CLIENT_ID : ''
 
 const AuthContext = createContext({ user: null, token: null, login: () => {}, logout: () => {}, sendMagicLink: async () => {}, verifyMagicLink: async () => {}, googleClientId: '', magicLinkEnabled: false })
 
@@ -76,9 +79,9 @@ export function AuthProvider({ children }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, sendMagicLink, verifyMagicLink, googleClientId: GOOGLE_CLIENT_ID, magicLinkEnabled: !!API_URL }}>
-      {GOOGLE_CLIENT_ID
-        ? <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{children}</GoogleOAuthProvider>
+    <AuthContext.Provider value={{ user, token, login, logout, sendMagicLink, verifyMagicLink, googleClientId: googleClientIdForUi, magicLinkEnabled: !!API_URL }}>
+      {googleClientIdForUi
+        ? <GoogleOAuthProvider clientId={googleClientIdForUi}>{children}</GoogleOAuthProvider>
         : children
       }
     </AuthContext.Provider>

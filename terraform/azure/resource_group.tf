@@ -1,5 +1,4 @@
-resource "azurerm_resource_group" "main" {
-  name     = "${var.project_name}-${var.environment}-rg"
-  location = var.location
-  tags     = local.tags
+# Shared across dev/test/prod — created manually, not managed by Terraform.
+data "azurerm_resource_group" "main" {
+  name = var.project_name
 }

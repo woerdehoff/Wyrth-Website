@@ -4,8 +4,8 @@
 
 resource "azurerm_storage_account" "website" {
   name                     = replace("${var.project_name}${var.environment}web", "-", "")
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
+  resource_group_name      = data.azurerm_resource_group.main.name
+  location                 = data.azurerm_resource_group.main.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
@@ -37,8 +37,8 @@ resource "azurerm_storage_container" "uploads" {
 # Runtime storage required by Azure Functions
 resource "azurerm_storage_account" "functions" {
   name                     = replace("${var.project_name}${var.environment}fn", "-", "")
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
+  resource_group_name      = data.azurerm_resource_group.main.name
+  location                 = data.azurerm_resource_group.main.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"

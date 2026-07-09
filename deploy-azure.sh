@@ -63,7 +63,7 @@ case "$ENV" in
 esac
 
 VAR_FILE="${ENV}.tfvars"
-BACKEND_KEY="wyrth-website-azure/${ENV}/terraform.tfstate"
+BACKEND_KEY="wyrth-website/${ENV}/terraform.tfstate"
 
 echo "=================================================="
 echo "Wyrth Website — Azure Deploy"

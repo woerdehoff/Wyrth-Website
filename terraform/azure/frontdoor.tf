@@ -8,7 +8,7 @@
 
 resource "azurerm_cdn_frontdoor_profile" "main" {
   name                = "${var.project_name}-${var.environment}-fd"
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = data.azurerm_resource_group.main.name
   sku_name            = "Standard_AzureFrontDoor"
   tags                = local.tags
 }

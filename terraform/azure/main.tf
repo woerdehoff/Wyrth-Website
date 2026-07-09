@@ -9,7 +9,7 @@ terraform {
     resource_group_name  = "wyrth-website-tfstate"
     storage_account_name = "wyrthwebsitetfstate"
     container_name       = "tfstate"
-    # key passed via: terraform init -backend-config="key=wyrth-website-azure/<env>/terraform.tfstate"
+    # key passed via: terraform init -backend-config="key=wyrth-website/<env>/terraform.tfstate"
   }
 
   required_providers {

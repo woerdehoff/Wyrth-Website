@@ -92,7 +92,9 @@ export default function SignInModal({ onClose, focusEmail = false }) {
               Sign in
             </h2>
             <p className="text-[0.875rem] text-bone-2 leading-[1.65] m-0 mb-5">
-              No password needed — choose how you'd like to sign in.
+              {googleClientId
+                ? "No password needed — choose how you'd like to sign in."
+                : 'No password needed — enter your email and we\'ll send a sign-in link.'}
             </p>
 
             {googleClientId && (

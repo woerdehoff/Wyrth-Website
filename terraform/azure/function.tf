@@ -4,8 +4,8 @@
 
 resource "azurerm_service_plan" "api" {
   name                = "${var.project_name}-${var.environment}-plan"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
   os_type             = "Linux"
   sku_name            = "Y1"
   tags                = local.tags
@@ -13,16 +13,16 @@ resource "azurerm_service_plan" "api" {
 
 resource "azurerm_application_insights" "api" {
   name                = "${var.project_name}-${var.environment}-insights"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
   application_type    = "web"
   tags                = local.tags
 }
 
 resource "azurerm_linux_function_app" "api" {
   name                       = "${var.project_name}-${var.environment}-api"
-  location                   = azurerm_resource_group.main.location
-  resource_group_name        = azurerm_resource_group.main.name
+  location                   = data.azurerm_resource_group.main.location
+  resource_group_name        = data.azurerm_resource_group.main.name
   service_plan_id            = azurerm_service_plan.api.id
   storage_account_name       = azurerm_storage_account.functions.name
   storage_account_access_key = azurerm_storage_account.functions.primary_access_key
