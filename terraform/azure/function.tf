@@ -11,11 +11,21 @@ resource "azurerm_service_plan" "api" {
   tags                = local.tags
 }
 
+resource "azurerm_log_analytics_workspace" "api" {
+  name                = "${var.project_name}-${var.environment}-logs"
+  location            = data.azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  tags                = local.tags
+}
+
 resource "azurerm_application_insights" "api" {
   name                = "${var.project_name}-${var.environment}-insights"
   location            = data.azurerm_resource_group.main.location
   resource_group_name = data.azurerm_resource_group.main.name
   application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.api.id
   tags                = local.tags
 }
 
