@@ -13,9 +13,14 @@ public/videos/
 !terraform/azure/dev.tfvars
 !terraform/azure/test.tfvars
 !terraform/azure/prod.tfvars
+!terraform/aws/example.tfvars
+!terraform/aws/dev.tfvars
+!terraform/aws/test.tfvars
+!terraform/aws/prod.tfvars
 
 # Never commit local secret overrides or active tfvars
 terraform/azure/secrets*.tfvars
+terraform/aws/secrets*.tfvars
 
 # Terraform local state, providers, plans, crash logs, deploy zips
 **/.terraform/
@@ -28,5 +33,8 @@ crash.*.log
 terraform/azure/api-deploy.zip
 terraform/azure/api-src.zip
 terraform/azure/.terraform.lock.hcl
+terraform/aws/api-deploy.zip
+terraform/aws/api-placeholder.zip
 azure-api/node_modules/
 azure-api/local.settings.json
+api/node_modules/

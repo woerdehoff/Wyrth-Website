@@ -1,52 +1,40 @@
-- Azure
-    Refresh Azure session
-        az login
+- AWS (primary)
+    Refresh AWS session
+        aws login
 
-    Generate a JWT secret (run 3x for prod/test/dev)
-        openssl rand -hex 32
+    One-time Terraform state bootstrap
+        ./scripts/bootstrap-aws-state.sh
+
+    Deploy
+        JWT_SECRET=... \
+        STRIPE_SECRET_KEY=sk_xxx STRIPE_WEBHOOK_SECRET=whsec_xxx \
+        ./deploy-aws.sh --env dev
+
+        ./deploy-aws.sh --env test
+        ./deploy-aws.sh --env prod --yes
+        ./deploy-aws.sh --env dev --plan
+
+    See documents/aws-migration.md
+
+- Magic-link email (Amazon SES)
+    From address is mail_from in terraform/aws/*.tfvars (noreply@wyrthco.com).
+    Domain wyrthco.com must stay verified in SES (us-east-1).
+    While SES is in the sandbox, you can only send to verified recipient addresses.
+    Request production access:
+        AWS Console → SES → Account dashboard → Request production access
+    Verify a test recipient (sandbox only):
+        aws sesv2 create-email-identity --email-identity you@example.com --region us-east-1
 
 - Secrets for deploy (set via environment variables)
     JWT_SECRET
-    MAIL_CLIENT_ID
-    MAIL_CLIENT_SECRET
     STRIPE_SECRET_KEY
     STRIPE_WEBHOOK_SECRET
 
     Generate a JWT secret:
         openssl rand -hex 32
 
-    Example full command:
-        JWT_SECRET=... MAIL_CLIENT_ID=... MAIL_CLIENT_SECRET=... \
-        STRIPE_SECRET_KEY=sk_xxx STRIPE_WEBHOOK_SECRET=whsec_xxx \
-        ./deploy-azure.sh --env prod --yes
-
-
-- Git + Deploy (terminal, trunk-based)
-    # Work on main (or short-lived feature branches)
-    git checkout main
-    git add .
-    git commit -m "feat: your change"
-    git push
-
-    # Deploy explicitly to any environment
-    ./deploy-azure.sh --env dev
-    ./deploy-azure.sh --env test
-    ./deploy-azure.sh --env prod --yes
-
-
 - Local Dev
-    VITE_CONTENT_API_URL="<your-dev-function-url>" \
+    VITE_CONTENT_API_URL="<your-api-gateway-url>" \
     VITE_GOOGLE_CLIENT_ID="<your-google-client-id>" \
     npm run dev
     # Admin at: http://localhost:5173/admin
-
-- Deploy from terminal (supports dev / test / prod)
-    ./deploy-azure.sh --env dev
-    ./deploy-azure.sh --env test
-    ./deploy-azure.sh --env prod
-
-    Plan only (no apply):
-    ./deploy-azure.sh --env dev --plan
-
-    Full help:
-    ./deploy-azure.sh --help

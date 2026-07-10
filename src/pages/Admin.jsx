@@ -730,7 +730,7 @@ function ProductsTab({ products, onSave, onDelete, status, onUploadImage }) {
   return (
     <section className="atab">
       <h2 className="atab__title">{editing ? 'Edit Product' : 'Add Product'}</h2>
-      <p className="atab__desc">Products are stored in Cosmos DB and shown on the /shop page.</p>
+      <p className="atab__desc">Products are stored in DynamoDB and shown on the /shop page.</p>
 
       <div className="products-tab__layout">
         <div className="products-tab__form">

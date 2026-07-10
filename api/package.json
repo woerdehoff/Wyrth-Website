@@ -1,0 +1,16 @@
+{
+  "name": "wyrth-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pack": "npm ci --omit=dev && zip -r ../terraform/aws/api-deploy.zip . -x '*.git*' -x 'local.settings.json'"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.758.0",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/client-sesv2": "^3.758.0",
+    "@aws-sdk/lib-dynamodb": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0"
+  }
+}

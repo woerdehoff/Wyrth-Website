@@ -12,7 +12,10 @@
     "deploy:test": "./deploy.sh --env test",
     "deploy:prod": "./deploy.sh --env prod",
     "deploy:azure:dev": "./deploy-azure.sh --env dev",
-    "deploy:azure:prod": "./deploy-azure.sh --env prod"
+    "deploy:azure:prod": "./deploy-azure.sh --env prod",
+    "deploy:aws:dev": "./deploy-aws.sh --env dev",
+    "deploy:aws:test": "./deploy-aws.sh --env test",
+    "deploy:aws:prod": "./deploy-aws.sh --env prod"
   },
   "dependencies": {
     "@azure/msal-browser": "^3.28.0",
