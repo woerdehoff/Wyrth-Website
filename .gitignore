@@ -14,8 +14,12 @@ public/videos/
 # Never commit local secret overrides or active tfvars
 terraform/azure/secrets*.tfvars
 
-terraform/azure/.terraform/
-terraform/azure/terraform.tfstate*
+# Terraform local state, providers, and plan files (never commit)
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/.command-center-tfplan
 terraform/azure/api-deploy.zip
 terraform/azure/.terraform.lock.hcl
 azure-api/node_modules/
