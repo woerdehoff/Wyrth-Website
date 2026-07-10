@@ -40,6 +40,6 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
     # Billing / cost allocation filter in Azure Cost Management
-    wyrth       = "true"
+    "wyrth-billing" = "true"
   }
 }

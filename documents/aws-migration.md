@@ -17,7 +17,9 @@ Move from Azure (Blob + Front Door + Functions + Cosmos) to AWS for lower fixed 
 | Customer auth | Google + magic link via **Amazon SES** |
 | Payments | Stripe (unchanged) |
 
-New resources are tagged `wyrth=true`.
+All Wyrth AWS resources are tagged `wyrth-billing=true` (Terraform `default_tags` for managed resources; legacy S3/CloudFront and existing API stack tagged in-account).
+
+**Cost Explorer:** After AWS discovers the tag (~24h), activate it under **Billing → Cost allocation tags** so you can filter/group costs by `wyrth-billing=true`. Also activate `Project` / `Environment` if you want env-level breakdowns.
 
 ### Existing static hosting (wired into tfvars)
 

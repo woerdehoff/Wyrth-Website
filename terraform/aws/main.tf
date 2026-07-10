@@ -5,9 +5,13 @@
 terraform {
   required_version = ">= 1.0"
 
+  # Bucket/region/encrypt are fixed for this account. State object key is
+  # still set at init (per env) by deploy-aws.sh / Command Center:
+  #   -backend-config="key=wyrth-website/<env>/terraform.tfstate"
   backend "s3" {
-    # Configure at init time via deploy-aws.sh:
-    #   -backend-config="bucket=..." -backend-config="key=..." etc.
+    bucket  = "wyrth-website-tfstate"
+    region  = "us-east-1"
+    encrypt = true
   }
 
   required_providers {
@@ -87,6 +91,6 @@ locals {
     Project     = var.project_name
     Environment = var.environment
     ManagedBy   = "terraform"
-    wyrth       = "true"
+    "wyrth-billing" = "true"
   }
 }
