@@ -18,14 +18,6 @@ export default function Hero() {
         className="relative z-[1] text-center w-full max-w-[900px] pt-24 pb-16 md:pt-40 md:pb-24"
         style={{ paddingLeft: '5%', paddingRight: '5%' }}
       >
-        {/* Pipeline deploy marker — remove after verifying CI/CD */}
-        <p
-          className="font-body text-[0.65rem] font-semibold tracking-[.2em] uppercase text-magenta mb-4 opacity-90"
-          data-testid="pipeline-deploy-marker"
-        >
-          Pipeline test · homepage updated
-        </p>
-
         <p
           className="font-body text-[0.7rem] font-semibold tracking-[.35em] uppercase text-magenta mb-7"
           style={{ animation: 'fadeUp 0.8s var(--ease-out) 0.2s both' }}
