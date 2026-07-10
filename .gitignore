@@ -5,6 +5,9 @@ Video/
 public/images/
 public/videos/
 .env
+.DS_Store
+.claude/
+
 *.tfvars
 !terraform/azure/example.tfvars
 !terraform/azure/dev.tfvars
@@ -14,13 +17,16 @@ public/videos/
 # Never commit local secret overrides or active tfvars
 terraform/azure/secrets*.tfvars
 
-# Terraform local state, providers, and plan files (never commit)
+# Terraform local state, providers, plans, crash logs, deploy zips
 **/.terraform/
 **/*.tfstate
 **/*.tfstate.*
 **/*.tfplan
 **/.command-center-tfplan
+crash.log
+crash.*.log
 terraform/azure/api-deploy.zip
+terraform/azure/api-src.zip
 terraform/azure/.terraform.lock.hcl
 azure-api/node_modules/
 azure-api/local.settings.json
