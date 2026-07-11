@@ -170,7 +170,7 @@ PY
 LAMBDA_ARN="$(aws lambda get-function --function-name "$LAMBDA_NAME" --region "$REGION" --query 'Configuration.FunctionArn' --output text)"
 aws lambda tag-resource \
   --resource "$LAMBDA_ARN" \
-  --tags Project=wyrth-website Environment="$ENV"
+  --tags "Project=wyrth-website,Environment=${ENV}"
 
 CF_ARN="arn:aws:cloudfront::${ACCOUNT_ID}:distribution/${CF_ID}"
 aws cloudfront tag-resource \
