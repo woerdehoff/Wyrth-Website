@@ -81,6 +81,7 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
   echo "ERROR: AWS credentials not available. Run: aws login" >&2
   exit 1
 fi
+ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 
 if [[ "$ENV" == "prod" && "$PLAN_ONLY" == "false" && "$AUTO_APPROVE" == "false" ]]; then
   read -rp "Type 'prod' to deploy to AWS PRODUCTION: " CONFIRM
@@ -140,6 +141,41 @@ LAMBDA_NAME=$(terraform output -raw lambda_function_name)
 REGION=$(terraform output -raw aws_region)
 
 cd "$SCRIPT_DIR"
+
+echo "→ Enforcing AWS resource tags..."
+python3 <<PY
+import json, subprocess
+bucket = "${SITE_BUCKET}"
+project = "wyrth-website"
+try:
+    raw = subprocess.check_output(
+        ["aws", "s3api", "get-bucket-tagging", "--bucket", bucket],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    )
+    tags = json.loads(raw).get("TagSet", [])
+except Exception:
+    tags = []
+
+tags = [t for t in tags if t.get("Key") != "Project"]
+tags.append({"Key": "Project", "Value": project})
+path = "/tmp/wyrth-site-tags.json"
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump({"TagSet": tags}, fh)
+subprocess.check_call(
+    ["aws", "s3api", "put-bucket-tagging", "--bucket", bucket, "--tagging", f"file://{path}"]
+)
+PY
+
+LAMBDA_ARN="$(aws lambda get-function --function-name "$LAMBDA_NAME" --region "$REGION" --query 'Configuration.FunctionArn' --output text)"
+aws lambda tag-resource \
+  --resource "$LAMBDA_ARN" \
+  --tags Project=wyrth-website Environment="$ENV"
+
+CF_ARN="arn:aws:cloudfront::${ACCOUNT_ID}:distribution/${CF_ID}"
+aws cloudfront tag-resource \
+  --resource "$CF_ARN" \
+  --tags "Items=[{Key=Project,Value=wyrth-website},{Key=Environment,Value=${ENV}}]"
 
 if ! $SKIP_BUILD; then
   echo "→ Building React app..."

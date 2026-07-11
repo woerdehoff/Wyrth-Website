@@ -23,7 +23,7 @@ function table(name) {
     'magic-tokens': process.env.MAGIC_TOKENS_TABLE,
   }
   if (explicit[name]) return explicit[name]
-  const prefix = process.env.DYNAMO_TABLE_PREFIX || 'wyrth-website-dev'
+  const prefix = process.env.DYNAMO_TABLE_PREFIX || 'wyrth-website'
   return `${prefix}-${name}`
 }
 

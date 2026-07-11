@@ -15,7 +15,7 @@ custom_domain = "dev.wyrthco.com"
 site_url      = "https://dev.wyrthco.com"
 
 manage_dynamodb     = false
-dynamo_table_prefix = "wyrth-website-dev"
+dynamo_table_prefix = "wyrth-website"
 
 entra_tenant_id  = "4c061c09-139b-4718-969f-b9b491911d8a"
 entra_client_id  = "8938c729-223c-4481-8a20-34a5694b825f"
